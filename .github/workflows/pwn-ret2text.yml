@@ -1,6 +1,5 @@
 name: pwn-ret2text
 
-# 触发条件：推送到 pwn-ret2text 分支，且修改了指定路径的文件；支持手动触发
 on:
   push:
     branches: [pwn-ret2text]
@@ -9,130 +8,92 @@ on:
       - ".github/workflows/pwn-ret2text.yml"
   workflow_dispatch:
 
-# 全局环境变量（可在所有 job 和 step 中使用）
 env:
-  NAME: pwn-ret2text  # 项目名称（与目录名一致）
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}  # 镜像前缀
+  NAME: pwn-ret2text  # 项目名称（和目录名一样）
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}  # 镜像前缀（比如 ghcr.io/yuanziran-zhangzhihao）
 
 jobs:
-  # 构建并推送 Docker 镜像的任务
   challenge-build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read        # 读取仓库代码
-      packages: write       # 推送镜像到 ghcr.io
-      id-token: write       # OIDC 认证（部分 Action 需要）
+      contents: read
+      packages: write  # 推镜像需要写权限
+      id-token: write
 
     steps:
-      # 1. 拉取仓库代码（含子模块和 LFS）
-      - name: Checkout repository
+      # 1. 拉代码
+      - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          lfs: true             # 启用 Git LFS（若有大文件）
-          submodules: true      # 拉取子模块
+        with: { lfs: true, submodules: true }
 
-      # 2. 验证 Dockerfile 存在（避免构建失败）
-      - name: Verify Dockerfile
+      # 2. 检查Dockerfile
+      - name: Check Dockerfile
         run: |
-          echo "🔍 检查 Dockerfile 路径：${{ env.NAME }}/build/Dockerfile"
+          echo "找Dockerfile：${{ env.NAME }}/build/Dockerfile"
           if [ ! -f "${{ env.NAME }}/build/Dockerfile" ]; then
-            echo "❌ 错误：未找到 Dockerfile！预期路径：${{ env.NAME }}/build/Dockerfile"
-            exit 1
+            echo "❌ 没找到Dockerfile！"; exit 1
           fi
-          echo "✅ Dockerfile 验证通过"
-          echo "📂 build 目录内容："
-          ls -la ${{ env.NAME }}/build
+          echo "✅ Dockerfile在这：$(pwd)/${{ env.NAME }}/build/Dockerfile"
 
-      # 3. 登录 GitHub 容器仓库 (ghcr.io)
-      - name: Log in to GitHub Container Registry (ghcr.io)
+      # 3. 登录ghcr.io
+      - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}          # GitHub 用户名（自动获取）
-          password: ${{ secrets.GITHUB_TOKEN }}  # GitHub 自动生成的 Token
+          username: ${{ github.actor }}  # 你的GitHub用户名
+          password: ${{ secrets.GITHUB_TOKEN }}  # GitHub自动给的Token
 
-      # 4. 提取镜像元数据（仅 ghcr.io）
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}  # 镜像地址：ghcr.io/用户名/项目名
-          tags: type=raw,value=latest                       # 固定标签为 latest
-
-      # 5. 构建并推送镜像到 ghcr.io
-      - name: Build and push Docker image
+      # 4. 构建并推送镜像
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ env.NAME }}/build          # 构建上下文（Dockerfile 所在目录）
-          push: true                              # 推送镜像到仓库
-          tags: ${{ steps.meta.outputs.tags }}    # 使用步骤 4 生成的标签（latest）
-          labels: ${{ steps.meta.outputs.labels }}# 自动生成镜像标签
+          context: ${{ env.NAME }}/build  # 构建上下文（Dockerfile所在目录）
+          push: true  # 推送到ghcr.io
+          tags: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest  # 镜像标签（比如 ghcr.io/yuanziran-zhangzhihao/pwn-ret2text:latest）
 
-      # 6. 验证镜像构建成功（关键调试步骤）
-      - name: Verify image integrity
-        run: |
-          echo "📦 已构建镜像列表："
-          docker images | grep "${{ env.NAME }}"
-          echo -e "\n🔍 检查目标镜像元数据："
-          docker inspect ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
-
-      # 7. 执行 post-build 脚本（提取附件）
+      # 5. 提取附件（用你之前的post-build.sh）
       - name: Run post-build script
-        working-directory: ${{ env.NAME }}/build  # 脚本所在目录：pwn-ret2text/build
+        working-directory: ${{ env.NAME }}/build
         env:
-          # 传递环境变量给脚本
-          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}  # 仓库所有者用户名
-          NAME: ${{ env.NAME }}                                      # 项目名称（pwn-ret2text）
-          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest  # 完整镜像标签
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          NAME: ${{ env.NAME }}
+          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
         run: |
-          echo "📂 当前工作目录：$(pwd)"
-          echo "📄 post-build.sh 内容："
-          cat post-build.sh
-          
-          chmod +x post-build.sh
-          ./post-build.sh
+          chmod +x post-build.sh && ./post-build.sh
 
-      # 8. 上传附件到 GitHub Artifacts（供下载）
+      # 6. 上传附件到Artifacts
       - name: Upload attachments
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.NAME }}-attachments  # Artifact 名称（下载时显示）
-          path: ${{ env.NAME }}/attachments/  # 附件目录（相对于仓库根目录）
-          retention-days: 30                 # 保留 30 天
+          name: ${{ env.NAME }}-attachments
+          path: ${{ env.NAME }}/attachments/
 
-  # 清理 ghcr.io 旧镜像的任务（保留 latest 标签）
+  # 清理旧镜像（重点修复这里！）
   prune-old-images:
     runs-on: ubuntu-latest
-    needs: challenge-build  # 依赖构建任务完成（无论成功失败）
-    if: always()            # 始终执行（即使构建失败）
-    permissions:
-      packages: write       # 删除镜像需要写权限
+    needs: challenge-build  # 等构建完再清理
+    if: always()  # 不管构建成功失败都试试清理（但找不到会跳过）
+    permissions: { packages: write }
 
     steps:
-      # 1. 生成正确的包名（用户名/项目名，小写）
-      - name: Generate lowercase package name
-        id: pkg-name
+      # 1. 生成包名（用户名/项目名，小写）
+      - name: Get package name
+        id: pkg
         run: |
-          # 正确格式：用户名/项目名（ghcr.io 规范）
-          package_name="${{ github.repository_owner }}/${{ env.NAME }}"
-          lowercase_name=$(echo "$package_name" | tr '[:upper:]' '[:lower:]')
-          echo "pkg_name=$lowercase_name" >> $GITHUB_OUTPUT
-          # 打印调试日志（关键！）
-          echo "repository_owner: ${{ github.repository_owner }}"
-          echo "env.NAME: ${{ env.NAME }}"
-          echo "generated package_name: $lowercase_name"
-          echo "full_package_name: $package_name"
+          # 包名格式：用户名/项目名（比如 yuanziran-zhangzhihao/pwn-ret2text）
+          pkg_name="${{ github.repository_owner }}/${{ env.NAME }}"
+          echo "pkg_name=$(echo $pkg_name | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+          echo "包名是：$pkg_name"  # 日志里能看到
 
-      # 2. 清理 ghcr.io 旧镜像（保留 latest 标签）- 修复版本
-      - name: Prune old images from ghcr.io
+      # 2. 清理旧镜像（关键：告诉工具去用户账户找包！）
+      - name: Clean old images
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}       # 认证 Token
-          owner: ${{ github.repository_owner }}     # 指定包的所有者（用户名）
-          package: ${{ steps.pkg-name.outputs.pkg_name }}  # 镜像包名（小写，格式：用户名/项目名）
-          package_type: user                       # 关键修复：指定为用户级包（不是仓库级包）
-          exclude-tags: latest                     # 排除 latest 标签（不删除）
-          dry-run: false                           # 实际执行删除（首次测试设为 true）
-          delete-untagged: true                    # 删除无标签镜像
-          delete-ghost-images: true                # 删除幽灵镜像
-          delete-partial-images: true              # 删除不完整镜像
+          token: ${{ secrets.GITHUB_TOKEN }}  # 认证用
+          owner: ${{ github.repository_owner }}  # 用户名（比如 yuanziran-zhangzhihao）→ 去谁的账户找
+          package: ${{ steps.pkg.outputs.pkg_name }}  # 包名（比如 yuanziran-zhangzhihao/pwn-ret2text）
+          exclude-tags: latest  # 保留最新的latest标签
+          dry-run: true  # 第一次用true预览（看看会删啥），确认没问题再改成false
+          delete-untagged: true  # 删没标签的旧镜像
+          delete-ghost-images: true  # 删“幽灵镜像”（没实际文件的）
+          # 注意：别加repository参数！加了就去仓库级找了，会错！
