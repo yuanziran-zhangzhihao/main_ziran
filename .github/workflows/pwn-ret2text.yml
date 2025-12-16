@@ -25,7 +25,6 @@ jobs:
           lfs: true
           submodules: true
 
-      # ✅ 修正1: 路径错误修正（从pwn-littlegame3 → pwn-ret2text）
       - name: Verify Dockerfile
         run: |
           echo "🔍 Checking Dockerfile in ${{ env.NAME }}/build"
@@ -36,13 +35,13 @@ jobs:
             exit 1
           fi
 
+      # ✅ 修正1: 使用正确的 Secret 名称 GITHUB_TOKEN
       - name: Log in to ghcr.io
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          # ✅ 修正2: Secret名称从GITHUB_TOKEN → GH_TOKEN
-          password: ${{ secrets.GH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}  # 修正这里
 
       - name: Log in to Aliyun Container Registry
         uses: docker/login-action@v3
@@ -56,10 +55,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/${{ github.repository }}/${{ env.NAME }}
+            # ✅ 修正2: 使用正确的命名空间格式
+            ghcr.io/${{ github.repository_owner }}/${{ env.NAME }}  # 修正这里
             ${{ secrets.ACR_REGISTRY }}/${{ secrets.ACR_NAMESPACE }}/${{ env.NAME }}
           tags: |
-            latest
+            type=raw,value=latest
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -92,14 +92,15 @@ jobs:
       - name: Get lower case package name
         id: lower_pkg
         run: |
-          export PKG_NAME="${{ github.event.repository.name }}/${{ env.NAME }}"
-          echo "pkg_name=${PKG_NAME@L}" >> $GITHUB_OUTPUT
+          # ✅ 修正3: 使用正确的包名格式
+          pkg_name="${{ github.repository_owner }}/${{ github.repository }}/${{ env.NAME }}"
+          echo "pkg_name=${pkg_name,,}" >> $GITHUB_OUTPUT  # 直接转小写
 
       - name: Prune old packages
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          # ✅ 修正3: Secret名称从GITHUB_TOKEN → GH_TOKEN
-          token: ${{ secrets.GH_TOKEN }}
+          # ✅ 修正4: 使用正确的 Secret 名称
+          token: ${{ secrets.GITHUB_TOKEN }}  # 修正这里
           package: ${{ steps.lower_pkg.outputs.pkg_name }}
           exclude-tags: latest
           dry-run: false
