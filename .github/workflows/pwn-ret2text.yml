@@ -25,13 +25,13 @@ jobs:
           lfs: true
           submodules: true
 
-      # ✅ 关键修正：添加 Dockerfile 验证
+      # ✅ 修正1: 路径错误修正（从pwn-littlegame3 → pwn-ret2text）
       - name: Verify Dockerfile
         run: |
           echo "🔍 Checking Dockerfile in ${{ env.NAME }}/build"
           ls -la ${{ env.NAME }}/build
           if [ ! -f "${{ env.NAME }}/build/Dockerfile" ]; then
-            echo "❌ ERROR: Dockerfile not found! (Expected: pwn-littlegame3/build/Dockerfile)"
+            echo "❌ ERROR: Dockerfile not found! (Expected: pwn-ret2text/build/Dockerfile)"
             echo "💡 Fix: Rename your Dockerfile to 'Dockerfile' (case-sensitive)"
             exit 1
           fi
@@ -41,7 +41,8 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # ✅ 修正2: Secret名称从GITHUB_TOKEN → GH_TOKEN
+          password: ${{ secrets.GH_TOKEN }}
 
       - name: Log in to Aliyun Container Registry
         uses: docker/login-action@v3
@@ -63,7 +64,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ${{ env.NAME }}/build  # ✅ 保持这个路径
+          context: ${{ env.NAME }}/build
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
@@ -97,7 +98,8 @@ jobs:
       - name: Prune old packages
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # ✅ 修正3: Secret名称从GITHUB_TOKEN → GH_TOKEN
+          token: ${{ secrets.GH_TOKEN }}
           package: ${{ steps.lower_pkg.outputs.pkg_name }}
           exclude-tags: latest
           dry-run: false
