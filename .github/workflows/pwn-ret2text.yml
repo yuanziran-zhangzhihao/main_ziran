@@ -117,14 +117,20 @@ jobs:
           package_name="${{ github.repository_owner }}/${{ env.NAME }}"
           lowercase_name=$(echo "$package_name" | tr '[:upper:]' '[:lower:]')
           echo "pkg_name=$lowercase_name" >> $GITHUB_OUTPUT
-          echo "Generated package name: $lowercase_name"  # 调试日志
+          # 打印调试日志（关键！）
+          echo "repository_owner: ${{ github.repository_owner }}"
+          echo "env.NAME: ${{ env.NAME }}"
+          echo "generated package_name: $lowercase_name"
+          echo "full_package_name: $package_name"
 
-      # 2. 清理 ghcr.io 旧镜像（保留 latest 标签）
+      # 2. 清理 ghcr.io 旧镜像（保留 latest 标签）- 修复版本
       - name: Prune old images from ghcr.io
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}       # 认证 Token
+          owner: ${{ github.repository_owner }}     # 指定包的所有者（用户名）
           package: ${{ steps.pkg-name.outputs.pkg_name }}  # 镜像包名（小写，格式：用户名/项目名）
+          package_type: user                       # 关键修复：指定为用户级包（不是仓库级包）
           exclude-tags: latest                     # 排除 latest 标签（不删除）
           dry-run: false                           # 实际执行删除（首次测试设为 true）
           delete-untagged: true                    # 删除无标签镜像
