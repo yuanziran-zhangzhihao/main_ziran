@@ -1,0 +1,31 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+
+void backdoor(){
+    printf("backdoor called\n");
+    system("/bin/sh");
+}
+
+void vuln(){
+    char buf[0x40];
+    void *p = malloc(0x100);
+    read(0,p,0x1000);
+    strcpy(buf,p);
+    free(p);
+}
+
+int main(){
+    char buf[0x40];
+    char *p = malloc(0x100);
+    puts("input your name:");
+    read(0,buf,0x40);
+    puts("input your pasword:");
+    read(0,p,0x100);
+    if(strcmp(buf,"admin")==0&&strcmp(p,"123456")==0){
+        puts("login success!");
+        vuln();
+    }else{
+        puts("login failed!");
+    }
+}
