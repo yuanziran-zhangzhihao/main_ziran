@@ -1,15 +1,15 @@
-name: pwn-littlegame3
+name: pwn-ret2text
 
 on:
   push:
-    branches: [pwn-littlegame3]
+    branches: [pwn-ret2text]
     paths:
-      - "pwn-littlegame3/**"
-      - ".github/workflows/pwn-littlegame3.yml"
+      - "pwn-ret2text/**"
+      - ".github/workflows/pwn-ret2text.yml"
   workflow_dispatch:
 
 env:
-  NAME: pwn-littlegame3
+  NAME: pwn-ret2text
 
 jobs:
   challenge-build:
