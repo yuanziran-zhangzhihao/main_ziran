@@ -33,6 +33,6 @@ RUN mkdir -p /home/ctf/bin && \
     cp /bin/ls /home/ctf/bin/ && \
     chmod +x /home/ctf/bin/*
 
-EXPOSE 60
+EXPOSE 8000
 
 CMD ["/start.sh"]
