@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # ==============================================
-# 配置区：根据实际环境调整（通常无需修改）
+# 配置区：根据实际环境调整
 # ==============================================
 # 镜像标签（应与工作流中构建的镜像标签一致）
-# 格式：ghcr.io/用户名/项目名:latest
 IMAGE_TAG="${IMAGE_TAG:-ghcr.io/${GITHUB_REPOSITORY_OWNER}/${NAME}:latest}"
 
 # 容器内文件路径（与 Dockerfile 中复制的路径对应）
@@ -13,7 +12,7 @@ CONTAINER_LIBC_PATH="/home/ctf/lib/x86_64-linux-gnu/libc.so.6"
 CONTAINER_LD_PATH="/home/ctf/lib64/ld-linux-x86-64.so.2"
 
 # 宿主机附件目录（相对于脚本执行目录的上一级 attachments 文件夹）
-ATTACHMENTS_DIR="../attachments"
+ATTACHMENTS_DIR="../attachments"  # 从 build/ 到 pwn-ret2text/attachments
 
 
 # ==============================================
@@ -21,6 +20,7 @@ ATTACHMENTS_DIR="../attachments"
 # ==============================================
 echo "===== Starting post-build attachment extraction ====="
 echo "Target image: $IMAGE_TAG"
+echo "Working directory: $(pwd)"
 echo "Attachments directory: $(pwd)/$ATTACHMENTS_DIR"
 
 # 1. 检查镜像是否存在
@@ -40,31 +40,34 @@ echo "Temporary container created: $CONTAINER_ID"
 
 # 3. 创建附件目录（若不存在）
 mkdir -p "$ATTACHMENTS_DIR"
-echo "Attachments directory ready: $(realpath "$ATTACHMENTS_DIR")"
+echo "Attachments directory ready: $(cd "$ATTACHMENTS_DIR" && pwd)"
 
 # 4. 复制文件（带错误检查）
 copy_file() {
     local src="$1"
-    local dest="$2"
-    if docker cp "$CONTAINER_ID:$src" "$dest" &> /dev/null; then
-        echo "✅ Copied: $src -> $dest"
+    local dest_dir="$2"
+    local filename=$(basename "$src")
+    
+    if docker cp "$CONTAINER_ID:$src" "$dest_dir/" &> /dev/null; then
+        echo "✅ Copied: $filename"
     else
-        echo "⚠️ Warning: Failed to copy $src (file may not exist in container)"
+        echo "⚠️ Warning: Failed to copy $filename (file may not exist in container)"
     fi
 }
 
 # 复制 pwn 文件
-copy_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR/"
+copy_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR"
 
 # 复制 libc 库
-copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR/"
+copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
 
 # 复制 ld-linux 加载器
-copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR/"
+copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
 
 # 5. 清理临时容器
 docker rm -v "$CONTAINER_ID" &> /dev/null
 echo "Temporary container removed: $CONTAINER_ID"
 
 echo "===== Attachment extraction completed ====="
-echo "Files saved to: $(realpath "$ATTACHMENTS_DIR")"
+echo "Files saved to: $(cd "$ATTACHMENTS_DIR" && pwd)"
+ls -l "$ATTACHMENTS_DIR"
