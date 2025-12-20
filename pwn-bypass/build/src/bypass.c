@@ -12,6 +12,7 @@ void vuln(){
     void *p = malloc(0x100);
     read(0,p,0x1000);
     memcpy(buf,p,0x100);
+    printf("chunk_addr: %p\n",p);
     free(p);
 }
 
