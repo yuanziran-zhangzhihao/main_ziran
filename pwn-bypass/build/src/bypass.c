@@ -11,7 +11,7 @@ void vuln(){
     char buf[0x40];
     void *p = malloc(0x100);
     read(0,p,0x1000);
-    strcpy(buf,p);
+    memcpy(buf,p,0x100);
     free(p);
 }
 
