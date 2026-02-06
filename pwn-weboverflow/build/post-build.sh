@@ -1,74 +1,83 @@
-#!/bin/bash
+#!/bin/sh
+set -eu
 
-# ==============================================
-# 配置区：根据实际环境调整（通常无需修改）
-# ==============================================
-# 镜像标签（应与工作流中构建的镜像标签一致）
-# 格式：ghcr.io/用户名/项目名:latest
-IMAGE_TAG="${IMAGE_TAG:-ghcr.io/${GITHUB_REPOSITORY_OWNER}/${NAME}:latest}"
-
-# 容器内文件路径（与 Dockerfile 中复制的路径对应）
-CONTAINER_PWN_PATH="/home/ctf/pwn"
-CONTAINER_LIBC_PATH="/home/ctf/lib/x86_64-linux-gnu/libc.so.6"
-CONTAINER_LD_PATH="/home/ctf/lib64/ld-linux-x86-64.so.2"
-
-# 宿主机附件目录（相对于脚本执行目录的上一级 attachments 文件夹）
-ATTACHMENTS_DIR="../attachments"  # 从 build/ 到 pwn-bypass/attachments
-
-
-# ==============================================
-# 执行逻辑：提取容器内文件到附件目录
-# ==============================================
-echo "===== Starting post-build attachment extraction ====="
-echo "Target image: $IMAGE_TAG"
-echo "Working directory: $(pwd)"
-echo "Attachments directory: $(pwd)/$ATTACHMENTS_DIR"
-
-# 1. 检查镜像是否存在
-if ! docker image inspect "$IMAGE_TAG" &> /dev/null; then
-    echo "❌ Error: Image $IMAGE_TAG not found locally. Ensure the image was built successfully."
-    exit 1
+# ----------------------------
+# 1) 写入 flag（你原来的逻辑）
+# ----------------------------
+if [ "${A1CTF_FLAG:-}" ]; then
+    INSERT_FLAG="$A1CTF_FLAG"
+    unset A1CTF_FLAG
+elif [ "${PCTF_FLAG:-}" ]; then
+    INSERT_FLAG="$PCTF_FLAG"
+    unset PCTF_FLAG
+elif [ "${GZCTF_FLAG:-}" ]; then
+    INSERT_FLAG="$GZCTF_FLAG"
+    unset GZCTF_FLAG
+elif [ "${FLAG:-}" ]; then
+    INSERT_FLAG="$FLAG"
+    unset FLAG
+else
+    INSERT_FLAG="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
 fi
 
-# 2. 从镜像创建临时容器（不启动）
-echo "Creating temporary container from image..."
-CONTAINER_ID=$(docker create "$IMAGE_TAG")
-if [ -z "$CONTAINER_ID" ]; then
-    echo "❌ Error: Failed to create container from image $IMAGE_TAG"
-    exit 1
+echo -n "$INSERT_FLAG" > /home/ctf/flag
+INSERT_FLAG=""
+chown ctf:ctf /home/ctf/flag
+
+# chroot 内提供 /sh（方便用 sh -c 执行命令）
+cp /bin/sh /home/ctf/sh && chmod +x /home/ctf/sh
+
+CHROOT_BIN="/usr/sbin/chroot"
+if [ ! -x "$CHROOT_BIN" ]; then
+  CHROOT_BIN="/usr/bin/chroot"
 fi
-echo "Temporary container created: $CONTAINER_ID"
 
-# 3. 创建附件目录（若不存在）
-mkdir -p "$ATTACHMENTS_DIR"
-echo "Attachments directory ready: $(cd "$ATTACHMENTS_DIR" && pwd)"
+# ----------------------------
+# 2) 启动 server（可选）
+# ----------------------------
+SERVER_ENABLE="${SERVER_ENABLE:-1}"
+SERVER_MODE="${SERVER_MODE:-daemon}"       # daemon | inetd
+SERVER_PORT="${SERVER_PORT:-8001}"         # 对外端口
+SERVER_INNER_PORT="${SERVER_INNER_PORT:-9000}"  # daemon 模式下 server 实际监听端口
+SERVER_CMD="${SERVER_CMD:-./server}"       # daemon 模式下在 chroot 内执行的命令
 
-# 4. 复制文件（带错误检查）
-copy_file() {
-    local src="$1"
-    local dest_dir="$2"
-    local filename=$(basename "$src")
-    
-    if docker cp "$CONTAINER_ID:$src" "$dest_dir/" &> /dev/null; then
-        echo "✅ Copied: $filename"
-    else
-        echo "⚠️ Warning: Failed to copy $filename (file may not exist in container)"
-    fi
+if [ "$SERVER_ENABLE" = "1" ] && [ -x /home/ctf/server ]; then
+  echo "[+] server enabled, mode=$SERVER_MODE"
+
+  if [ "$SERVER_MODE" = "daemon" ]; then
+    # daemon 模式：server 常驻运行（你需要确保它会自己 listen 一个端口）
+    # 如果你的 server 支持指定端口，建议在 workflow/平台里设置：
+    # SERVER_CMD="./server --port ${SERVER_INNER_PORT}"
+    "$CHROOT_BIN" /home/ctf /sh -c "$SERVER_CMD" &
+    SERVER_PID=$!
+    echo "[+] server started (pid=$SERVER_PID), expecting listen on 127.0.0.1:${SERVER_INNER_PORT}"
+
+    # 用 socat 把外部的 SERVER_PORT 转发到 server 的实际监听端口
+    socat -T60 TCP-LISTEN:${SERVER_PORT},reuseaddr,fork TCP:127.0.0.1:${SERVER_INNER_PORT} &
+    SERVER_FWD_PID=$!
+    echo "[+] server forwarder started: 0.0.0.0:${SERVER_PORT} -> 127.0.0.1:${SERVER_INNER_PORT} (pid=$SERVER_FWD_PID)"
+
+  else
+    # inetd 模式：每个连接启动一次 server（和 pwn 类似）
+    socat -T60 TCP-LISTEN:${SERVER_PORT},reuseaddr,fork EXEC:"$CHROOT_BIN /home/ctf ./server",stderr &
+    SERVER_FWD_PID=$!
+    echo "[+] server inetd started on :${SERVER_PORT} (pid=$SERVER_FWD_PID)"
+  fi
+else
+  echo "[-] server not started (SERVER_ENABLE=$SERVER_ENABLE, or /home/ctf/server missing)"
+fi
+
+# 退出时清理后台进程
+cleanup() {
+  echo "[*] cleanup..."
+  if [ "${SERVER_FWD_PID:-}" ]; then kill "$SERVER_FWD_PID" 2>/dev/null || true; fi
+  if [ "${SERVER_PID:-}" ]; then kill "$SERVER_PID" 2>/dev/null || true; fi
 }
+trap cleanup INT TERM EXIT
 
-# 复制 pwn 文件
-copy_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR"
-
-# 复制 libc 库
-copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
-
-# 复制 ld-linux 加载器
-copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
-
-# 5. 清理临时容器
-docker rm -v "$CONTAINER_ID" &> /dev/null
-echo "Temporary container removed: $CONTAINER_ID"
-
-echo "===== Attachment extraction completed ====="
-echo "Files saved to: $(cd "$ATTACHMENTS_DIR" && pwd)"
-ls -l "$ATTACHMENTS_DIR"
+# ----------------------------
+# 3) 启动 pwn（前台保持容器存活）
+# ----------------------------
+PWN_PORT="${PWN_PORT:-8000}"
+echo "[+] pwn service listen on :${PWN_PORT}"
+exec socat -T60 TCP-LISTEN:${PWN_PORT},reuseaddr,fork EXEC:"$CHROOT_BIN /home/ctf ./pwn",stderr
