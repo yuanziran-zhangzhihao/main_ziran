@@ -1,39 +1,63 @@
-# 使用 Debian 作为基础镜像（不再使用无效的 builder 阶段）
 FROM debian:bookworm-slim
 
-# 安装 socat
+# 只装运行期需要的：socat + ldd(在 libc-bin 里)；你要精简也可以后面删
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    socat \
+    socat libc-bin ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# 创建 ctf 用户和目录
-RUN groupadd -r ctf && useradd -r -g ctf ctf && \
-    mkdir -p /home/ctf && \
-    chown ctf:ctf /home/ctf
+# 创建用户（供 chroot 里 userspec/权限用）
+RUN groupadd -r ctf && useradd -r -g ctf -d /home/ctf -s /bin/sh ctf
 
-# 复制启动脚本（假设 start.sh 在 src/ 中）
+# 准备 chroot 目录结构
+WORKDIR /home/ctf
+RUN mkdir -p /home/ctf/{bin,lib,lib64,usr,dev,etc,tmp} \
+    && chmod 1733 /home/ctf/tmp
+
+# 复制启动脚本 & 二进制
 COPY src/start.sh /start.sh
 RUN chmod +x /start.sh
 
-WORKDIR /home/ctf
+COPY src/pwn /home/ctf/pwn
+RUN chmod +x /home/ctf/pwn
 
-# 复制题目二进制
-COPY src/pwn .
-RUN chmod +x pwn
+# （可选）如果你需要在 chroot 里提供基础命令，就复制进去
+# 注意：如果题目不需要这些命令，可以删掉这一段减少攻击面
+RUN set -eux; \
+    cp -a /bin/sh  /home/ctf/bin/; \
+    cp -a /bin/cat /home/ctf/bin/; \
+    cp -a /bin/ls  /home/ctf/bin/; \
+    chmod 555 /home/ctf/bin/*
 
-# ✅ 关键修复：直接从当前 Debian 系统复制必要的库到容器内指定路径
-# 注意：路径必须与 post-build.sh 中的 CONTAINER_*_PATH 一致
-RUN mkdir -p /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64 && \
-    cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/lib/x86_64-linux-gnu/ && \
-    cp /lib64/ld-linux-x86-64.so.2 /home/ctf/lib64/
+# 自动把依赖库复制到 chroot 根(/home/ctf)下对应路径
+# 关键点：把 /lib/... 复制到 /home/ctf/lib/...，把 /lib64/... 复制到 /home/ctf/lib64/...
+RUN set -eux; \
+    copy_deps() { \
+      bin="$1"; \
+      ldd "$bin" | awk '{for (i=1;i<=NF;i++) if ($i ~ /^\\//) print $i}' | sort -u | \
+      while read -r dep; do \
+        [ -e "$dep" ] || continue; \
+        dest="/home/ctf${dep}"; \
+        mkdir -p "$(dirname "$dest")"; \
+        cp -v "$dep" "$dest"; \
+      done; \
+    }; \
+    copy_deps /home/ctf/pwn; \
+    copy_deps /bin/sh; \
+    copy_deps /bin/cat; \
+    copy_deps /bin/ls
 
-# 创建 bin 目录并复制命令（可选，但不影响附件提取）
-RUN mkdir -p /home/ctf/bin && \
-    cp /bin/sh /home/ctf/bin/ && \
-    cp /bin/cat /home/ctf/bin/ && \
-    cp /bin/ls /home/ctf/bin/ && \
-    chmod +x /home/ctf/bin/*
+# 给 chroot 内放一些常用配置（有些程序会读取）
+RUN set -eux; \
+    cp -a /etc/nsswitch.conf /home/ctf/etc/ 2>/dev/null || true; \
+    cp -a /etc/hosts       /home/ctf/etc/ 2>/dev/null || true; \
+    cp -a /etc/resolv.conf /home/ctf/etc/ 2>/dev/null || true; \
+    printf 'ctf:x:%s:%s:ctf:/home/ctf:/bin/sh\n' "$(id -u ctf)" "$(id -g ctf)" > /home/ctf/etc/passwd; \
+    printf 'ctf:x:%s:\n' "$(id -g ctf)" > /home/ctf/etc/group
+
+# 权限收紧（可选，但建议）
+RUN chown -R root:root /home/ctf \
+    && chown ctf:ctf /home/ctf \
+    && chmod 755 /home/ctf
 
 EXPOSE 8000
-
 CMD ["/start.sh"]
