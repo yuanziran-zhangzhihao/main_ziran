@@ -2,10 +2,15 @@
 set -euo pipefail
 
 IMAGE_TAG="${IMAGE_TAG:-ghcr.io/${GITHUB_REPOSITORY_OWNER}/${NAME}:latest}"
-CONTAINER_PWN_PATH="/home/ctf/pwn"
-CONTAINER_LIB_DIR="/home/ctf/lib/x86_64-linux-gnu"
-CONTAINER_LD_PATH="/home/ctf/lib64/ld-linux-x86-64.so.2"
 ATTACHMENTS_DIR="../attachments"
+
+CONTAINER_PWN_PATH="/home/ctf/pwn"
+CONTAINER_LIBC_PATH="/home/ctf/lib/x86_64-linux-gnu/libc.so.6"
+CONTAINER_LIBNCURSES_PATH="/home/ctf/lib/x86_64-linux-gnu/libncurses.so.6"
+CONTAINER_LIBTINFO_PATH="/home/ctf/lib/x86_64-linux-gnu/libtinfo.so.6"
+CONTAINER_LIBDL_PATH="/home/ctf/lib/x86_64-linux-gnu/libdl.so.2"
+CONTAINER_LD_PATH_PRIMARY="/home/ctf/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"
+CONTAINER_LD_PATH_FALLBACK="/home/ctf/lib64/ld-linux-x86-64.so.2"
 
 echo "===== Starting post-build attachment extraction ====="
 echo "Target image: $IMAGE_TAG"
@@ -39,7 +44,7 @@ copy_file() {
     local filename
     filename=$(basename "$src")
 
-    if docker cp "$CONTAINER_ID:$src" "$dest_dir/" >/dev/null 2>&1; then
+    if docker cp "$CONTAINER_ID:$src" "$dest_dir/$filename" >/dev/null 2>&1; then
         echo "✅ Copied: $filename"
     else
         echo "❌ Error: Failed to copy $filename from $src"
@@ -47,21 +52,27 @@ copy_file() {
     fi
 }
 
-copy_dir_contents() {
-    local src_dir="$1"
-    local dest_dir="$2"
-
-    if docker cp "$CONTAINER_ID:$src_dir/." "$dest_dir/" >/dev/null 2>&1; then
-        echo "✅ Copied shared libraries from: $src_dir"
-    else
-        echo "❌ Error: Failed to copy shared libraries from $src_dir"
-        exit 1
+copy_ld() {
+    if docker cp "$CONTAINER_ID:$CONTAINER_LD_PATH_PRIMARY" "$ATTACHMENTS_DIR/ld-linux-x86-64.so.2" >/dev/null 2>&1; then
+        echo "✅ Copied: ld-linux-x86-64.so.2"
+        return
     fi
+
+    if docker cp "$CONTAINER_ID:$CONTAINER_LD_PATH_FALLBACK" "$ATTACHMENTS_DIR/ld-linux-x86-64.so.2" >/dev/null 2>&1; then
+        echo "✅ Copied: ld-linux-x86-64.so.2"
+        return
+    fi
+
+    echo "❌ Error: Failed to copy ld-linux-x86-64.so.2 from container"
+    exit 1
 }
 
 copy_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR"
-copy_dir_contents "$CONTAINER_LIB_DIR" "$ATTACHMENTS_DIR"
-copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
+copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
+copy_file "$CONTAINER_LIBNCURSES_PATH" "$ATTACHMENTS_DIR"
+copy_file "$CONTAINER_LIBTINFO_PATH" "$ATTACHMENTS_DIR"
+copy_file "$CONTAINER_LIBDL_PATH" "$ATTACHMENTS_DIR"
+copy_ld
 
 echo "===== Attachment extraction completed ====="
 echo "Files saved to: $(cd "$ATTACHMENTS_DIR" && pwd)"
