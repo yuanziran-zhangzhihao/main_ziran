@@ -1,0 +1,8 @@
+.git
+.github
+quickjs-2024-01-13/.obj
+quickjs-2024-01-13/qjs
+quickjs-2024-01-13/qjsc
+quickjs-2024-01-13/qjscalc.c
+quickjs-2024-01-13/repl.c
+dist
