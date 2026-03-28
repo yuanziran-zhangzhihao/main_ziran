@@ -1,0 +1,20 @@
+#!/bin/sh
+
+/bin/mount -t proc proc /proc
+/bin/mount -t sysfs sysfs /sys
+/bin/mount -t devtmpfs devtmpfs /dev || true
+/bin/mkdir -p /dev/pts
+/bin/mount -t devpts devpts /dev/pts || true
+
+echo 1 > /proc/sys/kernel/kptr_restrict 2>/dev/null || true
+echo 1 > /proc/sys/kernel/dmesg_restrict 2>/dev/null || true
+
+/bin/insmod /babydriver.ko
+
+echo
+echo "[+] babyioctl challenge booted"
+echo "[+] device: /dev/babyioctl"
+echo "[+] objective: leak the in-kernel flag with ioctl OOB read"
+echo
+
+exec /bin/sh

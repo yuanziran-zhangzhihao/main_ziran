@@ -1,0 +1,17 @@
+.git
+.gitignore
+exp
+*.o
+*.ko
+*.mod
+*.mod.c
+*.mod.o
+*.symvers
+*.order
+*.cmd
+Module.symvers
+modules.order
+.tmp_versions/
+.cache/
+bzImage
+rootfs.cpio.gz

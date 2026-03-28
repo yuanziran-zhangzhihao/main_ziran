@@ -1,0 +1,11 @@
+name: babyioctl
+
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /work
+    volumes:
+      - ./:/work
+    command: ["/usr/local/bin/challenge-build"]
