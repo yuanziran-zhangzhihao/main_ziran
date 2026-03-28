@@ -1,0 +1,105 @@
+name: pwn_router
+
+on:
+  push:
+    branches: [pwn-router]
+    paths:
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "routerd.c"
+      - "Makefile"
+      - "run.sh"
+      - "solve.py"
+      - "README.md"
+      - ".github/workflows/pwn_router.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-router:latest
+
+jobs:
+  challenge-build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check challenge files
+        run: |
+          test -f Dockerfile
+          test -f docker-compose.yml
+          test -f routerd.c
+          test -f Makefile
+          test -f solve.py
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}
+
+      - name: Pull image for artifact extraction
+        run: docker pull ${{ env.IMAGE }}
+
+      - name: Export challenge bundle
+        run: |
+          mkdir -p dist
+          docker run --rm -v "$PWD/dist:/out" ${{ env.IMAGE }} /bin/sh -c '
+            cp /app/routerd /out/routerd &&
+            cp /app/routerd.c /out/routerd.c &&
+            cp /app/README.md /out/README.md &&
+            cp /app/solve.py /out/solve.py &&
+            cp /app/run.sh /out/run.sh &&
+            cp /app/Dockerfile /out/Dockerfile &&
+            cp /app/docker-compose.yml /out/docker-compose.yml
+          '
+          tar -czf dist/pwn-router-bundle.tar.gz \
+            -C dist \
+            routerd routerd.c README.md solve.py run.sh Dockerfile docker-compose.yml
+
+      - name: Verify exported files
+        run: |
+          test -f dist/routerd
+          test -f dist/routerd.c
+          test -f dist/README.md
+          test -f dist/solve.py
+          test -f dist/pwn-router-bundle.tar.gz
+          file dist/routerd
+          ls -lh dist
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwn-router-artifacts
+          path: dist/
+
+  prune-old-images:
+    runs-on: ubuntu-latest
+    needs: challenge-build
+    if: always()
+    permissions:
+      packages: write
+
+    steps:
+      - name: Clean old images
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          package: pwn-router
+          exclude-tags: latest
+          dry-run: true
+          delete-untagged: true
+          delete-ghost-images: true
