@@ -1,90 +1,39 @@
-name: pwn-bypass
+# 使用 Debian 作为基础镜像（不再使用无效的 builder 阶段）
+FROM debian:bookworm-slim
 
-on:
-push:
-    branches: [pwn-bypass]
-workflow_dispatch:
+# 安装 socat
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    socat \
+    && rm -rf /var/lib/apt/lists/*
 
-env:
-NAME: pwn-bypass
-IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-bypass:latest
+# 创建 ctf 用户和目录
+RUN groupadd -r ctf && useradd -r -g ctf ctf && \
+    mkdir -p /home/ctf && \
+    chown ctf:ctf /home/ctf
 
-jobs:
-challenge-build:
-    runs-on: ubuntu-latest
-    permissions:
-    contents: read
-    packages: write
+# 复制启动脚本（假设 start.sh 在 src/ 中）
+COPY src/start.sh /start.sh
+RUN chmod +x /start.sh
 
-    steps:
-    - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-        lfs: true
-        submodules: true
+WORKDIR /home/ctf
 
-    - name: Check required files
-        run: |
-        test -f pwn-bypass/build/Dockerfile
-        test -f pwn-bypass/build/post-build.sh
-        test -f pwn-bypass/build/src/pwn
-        test -f pwn-bypass/build/src/start.sh
+# 复制题目二进制
+COPY src/pwn .
+RUN chmod +x pwn
 
-    - name: Login to ghcr.io
-        uses: docker/login-action@v3
-        with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+# ✅ 关键修复：直接从当前 Debian 系统复制必要的库到容器内指定路径
+# 注意：路径必须与 post-build.sh 中的 CONTAINER_*_PATH 一致
+RUN mkdir -p /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64 && \
+    cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/lib/x86_64-linux-gnu/ && \
+    cp /lib64/ld-linux-x86-64.so.2 /home/ctf/lib64/
 
-    - name: Build and push image
-        uses: docker/build-push-action@v5
-        with:
-        context: ./pwn-bypass/build
-        push: true
-        tags: ${{ env.IMAGE }}
+# 创建 bin 目录并复制命令（可选，但不影响附件提取）
+RUN mkdir -p /home/ctf/bin && \
+    cp /bin/sh /home/ctf/bin/ && \
+    cp /bin/cat /home/ctf/bin/ && \
+    cp /bin/ls /home/ctf/bin/ && \
+    chmod +x /home/ctf/bin/*
 
-    - name: Pull image for post-build
-        run: docker pull ${{ env.IMAGE }}
+EXPOSE 8000
 
-    - name: Run post-build script
-        working-directory: pwn-bypass/build
-        env:
-        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-        NAME: ${{ env.NAME }}
-        IMAGE_TAG: ${{ env.IMAGE }}
-        run: |
-        chmod +x post-build.sh
-        ./post-build.sh
-
-    - name: Verify attachments
-        run: |
-        test -f pwn-bypass/attachments/pwn
-        test -f pwn-bypass/attachments/libc.so.6
-        test -f pwn-bypass/attachments/ld-linux-x86-64.so.2
-        ls -lh pwn-bypass/attachments
-
-    - name: Upload attachments
-        uses: actions/upload-artifact@v4
-        with:
-        name: pwn-bypass-attachments
-        path: pwn-bypass/attachments/
-
-prune-old-images:
-    runs-on: ubuntu-latest
-    needs: challenge-build
-    if: always()
-    permissions:
-    packages: write
-
-    steps:
-    - name: Clean old images
-        uses: dataaxiom/ghcr-cleanup-action@v1
-        with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        owner: ${{ github.repository_owner }}
-        package: pwn-bypass
-        exclude-tags: latest
-        dry-run: true
-        delete-untagged: true
-        delete-ghost-images: true
+CMD ["/start.sh"]
