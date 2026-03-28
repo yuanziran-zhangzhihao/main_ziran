@@ -22,5 +22,6 @@ RUN apt-get update \
 
 WORKDIR /work
 COPY docker/build.sh /usr/local/bin/challenge-build
+RUN chmod 0755 /usr/local/bin/challenge-build
 
 CMD ["/usr/local/bin/challenge-build"]
