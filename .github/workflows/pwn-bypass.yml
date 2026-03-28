@@ -1,90 +1,91 @@
 name: pwn-bypass
 
 on:
-push:
-    branches: [pwn-bypass]
-workflow_dispatch:
+  push:
+    branches:
+      - pwn-bypass
+  workflow_dispatch:
 
 env:
-NAME: pwn-bypass
-IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-bypass:latest
+  NAME: pwn-bypass
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-bypass:latest
 
 jobs:
-challenge-build:
+  challenge-build:
     runs-on: ubuntu-latest
     permissions:
-    contents: read
-    packages: write
+      contents: read
+      packages: write
 
     steps:
-    - name: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-        lfs: true
-        submodules: true
+          lfs: true
+          submodules: true
 
-    - name: Check required files
+      - name: Check required files
         run: |
-        test -f pwn-bypass/build/Dockerfile
-        test -f pwn-bypass/build/post-build.sh
-        test -f pwn-bypass/build/src/pwn
-        test -f pwn-bypass/build/src/start.sh
+          test -f pwn-bypass/build/Dockerfile
+          test -f pwn-bypass/build/post-build.sh
+          test -f pwn-bypass/build/src/pwn
+          test -f pwn-bypass/build/src/start.sh
 
-    - name: Login to ghcr.io
+      - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push image
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-        context: ./pwn-bypass/build
-        push: true
-        tags: ${{ env.IMAGE }}
+          context: ./pwn-bypass/build
+          push: true
+          tags: ${{ env.IMAGE }}
 
-    - name: Pull image for post-build
+      - name: Pull image for post-build
         run: docker pull ${{ env.IMAGE }}
 
-    - name: Run post-build script
+      - name: Run post-build script
         working-directory: pwn-bypass/build
         env:
-        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-        NAME: ${{ env.NAME }}
-        IMAGE_TAG: ${{ env.IMAGE }}
+          GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+          NAME: ${{ env.NAME }}
+          IMAGE_TAG: ${{ env.IMAGE }}
         run: |
-        chmod +x post-build.sh
-        ./post-build.sh
+          chmod +x post-build.sh
+          ./post-build.sh
 
-    - name: Verify attachments
+      - name: Verify attachments
         run: |
-        test -f pwn-bypass/attachments/pwn
-        test -f pwn-bypass/attachments/libc.so.6
-        test -f pwn-bypass/attachments/ld-linux-x86-64.so.2
-        ls -lh pwn-bypass/attachments
+          test -f pwn-bypass/attachments/pwn
+          test -f pwn-bypass/attachments/libc.so.6
+          test -f pwn-bypass/attachments/ld-linux-x86-64.so.2
+          ls -lh pwn-bypass/attachments
 
-    - name: Upload attachments
+      - name: Upload attachments
         uses: actions/upload-artifact@v4
         with:
-        name: pwn-bypass-attachments
-        path: pwn-bypass/attachments/
+          name: pwn-bypass-attachments
+          path: pwn-bypass/attachments/
 
-prune-old-images:
+  prune-old-images:
     runs-on: ubuntu-latest
     needs: challenge-build
     if: always()
     permissions:
-    packages: write
+      packages: write
 
     steps:
-    - name: Clean old images
+      - name: Clean old images
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        owner: ${{ github.repository_owner }}
-        package: pwn-bypass
-        exclude-tags: latest
-        dry-run: true
-        delete-untagged: true
-        delete-ghost-images: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          owner: ${{ github.repository_owner }}
+          package: pwn-bypass
+          exclude-tags: latest
+          dry-run: true
+          delete-untagged: true
+          delete-ghost-images: true
