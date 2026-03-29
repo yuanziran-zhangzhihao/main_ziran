@@ -54,6 +54,14 @@ RUN set -eux; \
         cp -v --parents /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /home/ctf/; \
     fi
 
+RUN set -eux; \
+    if [ -d /lib/terminfo ]; then \
+        cp -a --parents /lib/terminfo /home/ctf/; \
+    fi; \
+    if [ -d /usr/share/terminfo ]; then \
+        cp -a --parents /usr/share/terminfo /home/ctf/; \
+    fi
+
 RUN mkdir -p /home/ctf/bin && \
     cp /bin/sh /home/ctf/bin/ && \
     cp /bin/cat /home/ctf/bin/ && \
