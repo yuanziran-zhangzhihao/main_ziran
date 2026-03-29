@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <time.h>
+#include <string.h>
 #include <ncurses.h>
 #include <fcntl.h>，
 #define WIDTH 40
@@ -139,6 +140,19 @@ int logic(){
 }
 }
 int game(){
+    char *term;
+
+    if (!isatty(STDIN_FILENO) || !isatty(STDOUT_FILENO)) {
+        puts("The snake game is only available in an interactive terminal.");
+        return 0;
+    }
+
+    term = getenv("TERM");
+    if (term == NULL || strcmp(term, "dumb") == 0 || strcmp(term, "unknown") == 0) {
+        puts("The snake game requires a valid terminal type.");
+        return 0;
+    }
+
     initscr();  
     init();
     noecho();
@@ -187,7 +201,11 @@ int main(){
     while(1){
     menu();
     char choice;
-    read(0,&choice,1);
+    do {
+        if (read(0,&choice,1) != 1) {
+            return 0;
+        }
+    } while (choice == '\n' || choice == '\r');
     if(choice == '1'){
         game();
     }
