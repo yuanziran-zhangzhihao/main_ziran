@@ -60,6 +60,13 @@ RUN mkdir -p /home/ctf/bin && \
     cp /bin/ls /home/ctf/bin/ && \
     chmod +x /home/ctf/bin/*
 
+RUN set -eux; \
+    mkdir -p /home/ctf/dev; \
+    mknod -m 666 /home/ctf/dev/null c 1 3; \
+    mknod -m 666 /home/ctf/dev/zero c 1 5; \
+    mknod -m 666 /home/ctf/dev/random c 1 8; \
+    mknod -m 666 /home/ctf/dev/urandom c 1 9
+
 EXPOSE 8000
 
 CMD ["/start.sh"]
