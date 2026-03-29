@@ -4,10 +4,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
     libncurses6 \
     libtinfo6 \
+    ncurses-base \
+    ncurses-term \
     libstdc++6 \
     libgcc-s1 \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+ENV TERM=xterm
 
 RUN groupadd -r ctf && useradd -r -g ctf ctf && \
     mkdir -p /home/ctf && \
@@ -55,6 +59,9 @@ RUN set -eux; \
     fi
 
 RUN set -eux; \
+    if [ -d /etc/terminfo ]; then \
+        cp -a --parents /etc/terminfo /home/ctf/; \
+    fi; \
     if [ -d /lib/terminfo ]; then \
         cp -a --parents /lib/terminfo /home/ctf/; \
     fi; \
