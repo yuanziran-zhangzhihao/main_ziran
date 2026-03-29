@@ -84,4 +84,4 @@ RUN set -eux; \
 
 EXPOSE 8000
 
-CMD ["/start.sh"]
+ENTRYPOINT ["/start.sh"]
