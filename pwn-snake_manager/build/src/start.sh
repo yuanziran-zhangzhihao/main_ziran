@@ -29,4 +29,7 @@ if [ ! -x "$CHROOT_BIN" ]; then
     CHROOT_BIN="/usr/bin/chroot"
 fi
 
-exec socat -T60 TCP-LISTEN:8000,reuseaddr,fork EXEC:"TERM=xterm $CHROOT_BIN /home/ctf ./pwn",pty,stderr,setsid,sigint,sane
+export TERM="${TERM:-xterm}"
+export TERMINFO="${TERMINFO:-/usr/share/terminfo}"
+export TERMINFO_DIRS="${TERMINFO_DIRS:-/etc/terminfo:/lib/terminfo:/usr/share/terminfo}"
+exec socat -T60 TCP-LISTEN:8000,reuseaddr,fork EXEC:"TERM=${TERM} TERMINFO=${TERMINFO} TERMINFO_DIRS=${TERMINFO_DIRS} $CHROOT_BIN /home/ctf ./pwn",pty,ctty,stderr,setsid,sigint,sane
