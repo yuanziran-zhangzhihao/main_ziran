@@ -12,6 +12,7 @@ chmod u+w "$ROOTFS_DIR/etc" 2>/dev/null || true
 chmod u+w "$ROOTFS_DIR/etc/ctf.flag" "$ROOTFS_DIR/etc/ctf.expected" 2>/dev/null || true
 rm -f "$ROOTFS_DIR/etc/ctf.flag" "$ROOTFS_DIR/etc/ctf.expected"
 install -m 0755 "$SCRIPT_DIR/guest/check_cache.sh" "$ROOTFS_DIR/bin/check_cache.sh"
+install -m 0755 "$SCRIPT_DIR/guest/report_flag.sh" "$ROOTFS_DIR/bin/report_flag.sh"
 printf '%s\n' "$FLAG_VALUE" > "$ROOTFS_DIR/etc/ctf.flag"
 printf '%s\n' "$EXPECTED_CACHE_VALUE" > "$ROOTFS_DIR/etc/ctf.expected"
 chmod 0400 "$ROOTFS_DIR/etc/ctf.flag" "$ROOTFS_DIR/etc/ctf.expected"

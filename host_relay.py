@@ -5,15 +5,17 @@ import http.server
 import select
 import socket
 import socketserver
+import subprocess
 import threading
 import time
 import urllib.parse
 
 
 class FlagState:
-    def __init__(self):
+    def __init__(self, rootfs_image):
         self._lock = threading.Lock()
         self._value = None
+        self._rootfs_image = rootfs_image
 
     def set(self, value):
         value = value.strip()
@@ -25,7 +27,32 @@ class FlagState:
 
     def get(self):
         with self._lock:
-            return self._value
+            if self._value:
+                return self._value
+
+        if not self._rootfs_image:
+            return None
+
+        try:
+            result = subprocess.run(
+                ["debugfs", "-R", "cat /tmp/flag_out", self._rootfs_image],
+                capture_output=True,
+                text=True,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return None
+
+        if result.returncode != 0:
+            return None
+
+        value = result.stdout.strip()
+        if not value or value == "File not found.":
+            return None
+
+        self.set(value)
+        return value
 
 
 class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
@@ -135,6 +162,7 @@ def parse_args():
     parser.add_argument("--target-port", type=int, default=37216)
     parser.add_argument("--callback-host", default="0.0.0.0")
     parser.add_argument("--callback-port", type=int, default=39000)
+    parser.add_argument("--rootfs-image", default="/opt/hg532-ctf/hg532-rootfs.ext2")
     parser.add_argument("--peek-timeout", type=float, default=0.35)
     parser.add_argument("--connect-timeout", type=float, default=3.0)
     parser.add_argument("--idle-timeout", type=float, default=10.0)
@@ -143,7 +171,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    flag_state = FlagState()
+    flag_state = FlagState(args.rootfs_image)
 
     callback_server = ThreadingHTTPServer((args.callback_host, args.callback_port), CallbackHandler)
     callback_server.flag_state = flag_state
