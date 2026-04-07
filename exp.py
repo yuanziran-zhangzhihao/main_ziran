@@ -124,7 +124,9 @@ def main():
         )
         print("\nstatus_code: " + str(r.status_code))
         print("\n" + r.text)
-        if r.status_code == 200 and "/bin/check_cache.sh" in cmd:
+        if r.status_code == 200 and (
+            "/bin/check_cache.sh" in cmd or "/bin/report_flag.sh" in cmd
+        ):
             if not recv_flag(args.host, args.port, args.flag_timeout):
                 raise SystemExit(1)
     except requests.exceptions.RequestException as e:
