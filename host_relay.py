@@ -2,6 +2,7 @@
 
 import argparse
 import http.server
+import os
 import select
 import socket
 import socketserver
@@ -12,10 +13,11 @@ import urllib.parse
 
 
 class FlagState:
-    def __init__(self, rootfs_image):
+    def __init__(self, rootfs_image, console_log):
         self._lock = threading.Lock()
         self._value = None
         self._rootfs_image = rootfs_image
+        self._console_log = console_log
 
     def set(self, value):
         value = value.strip()
@@ -29,6 +31,23 @@ class FlagState:
         with self._lock:
             if self._value:
                 return self._value
+
+        if self._console_log and os.path.exists(self._console_log):
+            try:
+                with open(self._console_log, "rb") as handle:
+                    handle.seek(0, os.SEEK_END)
+                    size = handle.tell()
+                    handle.seek(max(0, size - 65536))
+                    tail = handle.read().decode(errors="replace")
+            except OSError:
+                tail = ""
+
+            marker = "__HG532_FLAG__"
+            if marker in tail:
+                value = tail.rsplit(marker, 1)[-1].splitlines()[0].strip()
+                if value:
+                    self.set(value)
+                    return value
 
         if not self._rootfs_image:
             return None
@@ -163,6 +182,7 @@ def parse_args():
     parser.add_argument("--callback-host", default="0.0.0.0")
     parser.add_argument("--callback-port", type=int, default=39000)
     parser.add_argument("--rootfs-image", default="/opt/hg532-ctf/hg532-rootfs.ext2")
+    parser.add_argument("--console-log", default="/tmp/hg532-session/console.log")
     parser.add_argument("--peek-timeout", type=float, default=0.35)
     parser.add_argument("--connect-timeout", type=float, default=3.0)
     parser.add_argument("--idle-timeout", type=float, default=10.0)
@@ -171,7 +191,7 @@ def parse_args():
 
 def main():
     args = parse_args()
-    flag_state = FlagState(args.rootfs_image)
+    flag_state = FlagState(args.rootfs_image, args.console_log)
 
     callback_server = ThreadingHTTPServer((args.callback_host, args.callback_port), CallbackHandler)
     callback_server.flag_state = flag_state
