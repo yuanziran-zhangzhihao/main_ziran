@@ -7,7 +7,7 @@
 - 不包含 `debian_squeeze_mips_standard.qcow2` 这种超过 GitHub 普通仓库限制的大文件。
 - Docker 构建时会自动下载 Debian MIPS kernel 和 qcow2。
 - 固件 rootfs、flag 注入脚本、checker、GitHub Actions workflow 都已经带上。
-- push 到 `main` / `master` 或打 `v*` tag 后，会自动构建并推送到 `ghcr.io`。
+- push 到 `CVE2017iot` 分支或打 `v*` tag 后，会自动构建并推送到 `ghcr.io`。
 - 默认 PoC 会直接把 flag 弹到用户终端。
 
 ## 本地构建

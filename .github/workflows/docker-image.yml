@@ -3,8 +3,7 @@ name: docker-image
 on:
   push:
     branches:
-      - main
-      - master
+      - CVE2017iot
     tags:
       - 'v*'
   workflow_dispatch:
@@ -48,7 +47,7 @@ jobs:
         with:
           images: ${{ steps.prep.outputs.image }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/CVE2017iot' }}
             type=ref,event=branch
             type=ref,event=tag
             type=sha
