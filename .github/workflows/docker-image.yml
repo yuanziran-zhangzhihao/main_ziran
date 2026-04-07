@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 
 env:
+  PACKAGE_NAME: cve2017iot-hg532
   DOCKER_BUILD_SUMMARY: false
   DOCKER_BUILD_RECORD_UPLOAD: false
 
@@ -42,7 +43,9 @@ jobs:
           owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
           repo="$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')"
           branch="$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]')"
-          echo "image=ghcr.io/${owner}/${repo}" >> "$GITHUB_OUTPUT"
+          package="$(printf '%s' "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          echo "repo_name=${repo}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${owner}/${package}" >> "$GITHUB_OUTPUT"
           echo "branch_tag=${branch}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
@@ -77,6 +80,7 @@ jobs:
           push: true
           build-args: |
             BASE_IMAGE=ubuntu:20.04
+            REPOSITORY_URL=${{ github.server_url }}/${{ github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

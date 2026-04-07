@@ -3,8 +3,11 @@ FROM ${BASE_IMAGE}
 
 ARG KERNEL_URL=https://people.debian.org/~aurel32/qemu/mips/vmlinux-2.6.32-5-4kc-malta
 ARG DISK_URL=https://people.debian.org/~aurel32/qemu/mips/debian_squeeze_mips_standard.qcow2
+ARG REPOSITORY_URL=https://github.com/example/example
 
 ENV DEBIAN_FRONTEND=noninteractive
+LABEL org.opencontainers.image.source="$REPOSITORY_URL" \
+      org.opencontainers.image.description="HG532 CVE-2017-17215 CTF challenge"
 WORKDIR /opt/hg532-ctf
 
 RUN apt-get update \
