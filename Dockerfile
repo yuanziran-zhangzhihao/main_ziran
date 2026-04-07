@@ -20,8 +20,10 @@ RUN apt-get update \
         net-tools \
         procps \
         python3 \
+        openssh-client \
         python3-requests \
         qemu-system-mips \
+        sshpass \
         tmux \
     && rm -rf /var/lib/apt/lists/*
 

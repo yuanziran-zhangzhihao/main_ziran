@@ -24,7 +24,7 @@ if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     tmux new-session -d -s "$TMUX_SESSION" -c "$SCRIPT_DIR" "env SSH_FWD_PORT=$SSH_FWD_PORT UPNP_FWD_PORT=$UPNP_FWD_PORT GUEST_UPNP_PORT=$GUEST_UPNP_PORT ./start.sh"
 fi
 
-env TMUX_SESSION="$TMUX_SESSION" ROUTER_PORT="$GUEST_UPNP_PORT" "$SCRIPT_DIR/init_router_console.sh"
+env TMUX_SESSION="$TMUX_SESSION" ROUTER_PORT="$GUEST_UPNP_PORT" SSH_PORT="$SSH_FWD_PORT" "$SCRIPT_DIR/init_router_console.sh"
 
 for ((i = 0; i < CHECK_TIMEOUT; i++)); do
     if timeout 2 bash -lc "exec 3<>/dev/tcp/127.0.0.1/${UPNP_FWD_PORT}; printf 'GET /ctrlt/DeviceUpgrade_1 HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n' >&3; IFS= read -r line <&3; [[ \$line == HTTP/* ]]" >/dev/null 2>&1; then

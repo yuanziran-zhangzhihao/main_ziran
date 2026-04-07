@@ -8,6 +8,10 @@ LOGIN_PASS="${LOGIN_PASS:-root}"
 MOUNT_POINT="${MOUNT_POINT:-/mnt/hg532}"
 ROOTFS_DEVICE="${ROOTFS_DEVICE:-}"
 ROUTER_PORT="${ROUTER_PORT:-37215}"
+SSH_HOST="${SSH_HOST:-127.0.0.1}"
+SSH_PORT="${SSH_PORT:-2222}"
+SSH_CONNECT_TIMEOUT="${SSH_CONNECT_TIMEOUT:-5}"
+SSH_BOOT_TIMEOUT="${SSH_BOOT_TIMEOUT:-120}"
 QEMU_GUEST_IFACE="${QEMU_GUEST_IFACE:-eth0}"
 QEMU_GUEST_IP="${QEMU_GUEST_IP:-10.0.2.15}"
 QEMU_GUEST_NETMASK="${QEMU_GUEST_NETMASK:-255.255.255.0}"
@@ -16,9 +20,11 @@ NETWORK_SETTLE_DELAY="${NETWORK_SETTLE_DELAY:-15}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
 STEP_TIMEOUT="${STEP_TIMEOUT:-30}"
 POLL_INTERVAL="${POLL_INTERVAL:-1}"
+USE_SSH=0
+SSH_BASE=()
 
 capture_pane() {
-    tmux capture-pane -pS -80 -t "$TMUX_SESSION" 2>/dev/null || true
+    tmux capture-pane -pS -120 -t "$TMUX_SESSION" 2>/dev/null || true
 }
 
 wait_for_regex() {
@@ -37,7 +43,7 @@ wait_for_regex() {
     done
 
     echo "[-] timed out waiting for pattern: $regex" >&2
-    printf "%s\n" "$pane" | tail -n 80 >&2
+    printf '%s\n' "$pane" | tail -n 120 >&2
     return 1
 }
 
@@ -46,7 +52,37 @@ send_line() {
     tmux send-keys -t "$TMUX_SESSION" Enter
 }
 
-run_cmd() {
+build_ssh_base() {
+    SSH_BASE=(
+        sshpass -p "$LOGIN_PASS"
+        ssh
+        -o StrictHostKeyChecking=no
+        -o UserKnownHostsFile=/dev/null
+        -o PreferredAuthentications=password
+        -o PubkeyAuthentication=no
+        -o NumberOfPasswordPrompts=1
+        -o ConnectTimeout="$SSH_CONNECT_TIMEOUT"
+        -p "$SSH_PORT"
+        "$LOGIN_USER@$SSH_HOST"
+    )
+}
+
+wait_for_ssh() {
+    local timeout="$1"
+    local elapsed=0
+
+    while (( elapsed < timeout )); do
+        if "${SSH_BASE[@]}" true >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep "$POLL_INTERVAL"
+        elapsed=$((elapsed + POLL_INTERVAL))
+    done
+
+    return 1
+}
+
+run_cmd_console() {
     local cmd="$1"
     local timeout="${2:-$STEP_TIMEOUT}"
     local marker="__HG532_DONE_${RANDOM}_${RANDOM}__"
@@ -55,7 +91,7 @@ run_cmd() {
     local status
 
     send_line "$cmd"
-    send_line "printf '${marker}:%s\n' \$?"
+    send_line "printf '${marker}:%s\\n' \$?"
     wait_for_regex "${marker}:[0-9]+" "$timeout"
 
     pane="$(capture_pane)"
@@ -63,9 +99,30 @@ run_cmd() {
     status="${status_line##*:}"
 
     if [[ -z "$status_line" || "$status" != "0" ]]; then
-        echo "[-] guest command failed: $cmd" >&2
-        printf '%s\n' "$pane" | tail -n 40 >&2
+        echo "[-] guest command failed via console: $cmd" >&2
+        printf '%s\n' "$pane" | tail -n 60 >&2
         exit 1
+    fi
+}
+
+run_cmd_ssh() {
+    local cmd="$1"
+    local timeout="${2:-$STEP_TIMEOUT}"
+    local quoted
+
+    quoted="$(printf '%q' "$cmd")"
+
+    if ! timeout "$timeout" "${SSH_BASE[@]}" "sh -lc $quoted"; then
+        echo "[-] guest command failed via ssh: $cmd" >&2
+        exit 1
+    fi
+}
+
+run_cmd() {
+    if [[ "$USE_SSH" == "1" ]]; then
+        run_cmd_ssh "$@"
+    else
+        run_cmd_console "$@"
     fi
 }
 
@@ -74,15 +131,27 @@ if ! tmux has-session -t "$TMUX_SESSION" 2>/dev/null; then
     exit 1
 fi
 
-wait_for_regex 'debian-mips login:|root@debian-mips:.*#' "$BOOT_TIMEOUT"
+if command -v sshpass >/dev/null 2>&1 && command -v ssh >/dev/null 2>&1; then
+    build_ssh_base
+    if wait_for_ssh "$SSH_BOOT_TIMEOUT"; then
+        USE_SSH=1
+        echo "[*] guest bootstrap via ssh: ${SSH_HOST}:${SSH_PORT}"
+    else
+        echo "[*] ssh bootstrap not ready, falling back to console" >&2
+    fi
+fi
 
-if ! capture_pane | grep -Eq 'root@debian-mips:.*#'; then
-    tmux send-keys -t "$TMUX_SESSION" Enter
-    wait_for_regex 'debian-mips login:' 10
-    send_line "$LOGIN_USER"
-    wait_for_regex 'Password:' 15
-    send_line "$LOGIN_PASS"
-    wait_for_regex 'root@debian-mips:.*#' 20
+if [[ "$USE_SSH" != "1" ]]; then
+    wait_for_regex 'debian-mips login:|root@debian-mips:.*#' "$BOOT_TIMEOUT"
+
+    if ! capture_pane | grep -Eq 'root@debian-mips:.*#'; then
+        tmux send-keys -t "$TMUX_SESSION" Enter
+        wait_for_regex 'debian-mips login:' 10
+        send_line "$LOGIN_USER"
+        wait_for_regex 'Password:' 15
+        send_line "$LOGIN_PASS"
+        wait_for_regex 'root@debian-mips:.*#' 20
+    fi
 fi
 
 run_cmd "mkdir -p $MOUNT_POINT"
