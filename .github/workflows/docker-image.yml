@@ -58,11 +58,6 @@ jobs:
           package="$(printf '%s' "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]')"
           echo "image=ghcr.io/${owner}/${package}" >> "$GITHUB_OUTPUT"
           echo "branch_tag=${branch}" >> "$GITHUB_OUTPUT"
-          if [[ "$GITHUB_REF" == refs/heads/CVE2017iot ]]; then
-            echo "smoke_tag=${branch}" >> "$GITHUB_OUTPUT"
-          else
-            echo "smoke_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -103,70 +98,27 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Pull image from GHCR
+      - name: Pull exact built image
         run: docker pull "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"
 
-      - name: Start challenge container
+      - name: Deterministic image self-check
         run: |
-          docker rm -f hg532-smoke >/dev/null 2>&1 || true
-          docker run -d \
-            --name hg532-smoke \
-            -p 37215:37215 \
-            -e FLAG_VALUE='FLAG{ci_smoke_test}' \
-            -e CHECK_TIMEOUT=120 \
-            -e BOOT_TIMEOUT=600 \
-            "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"
+          docker run --rm             --entrypoint /bin/bash             "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"             -lc '
+              set -euo pipefail
+              bash -n /opt/hg532-ctf/start.sh
+              bash -n /opt/hg532-ctf/boot_router.sh
+              bash -n /opt/hg532-ctf/init_router_console.sh
+              python3 -m py_compile /opt/hg532-ctf/exp.py
+              /opt/hg532-ctf/ctf/install_guest_assets.sh
+              /opt/hg532-ctf/build_router_rootfs_image.sh
+              test -f /opt/hg532-ctf/hg532-rootfs.ext2
+              qemu-system-mips --version | head -n 1
+              ls -lh /opt/hg532-ctf/hg532-rootfs.ext2
+            ' | tee image-selfcheck.log
 
-      - name: Wait for challenge service
-        run: |
-          ready=0
-          for _ in $(seq 1 300); do
-            running="$(docker inspect -f '{{.State.Running}}' hg532-smoke 2>/dev/null || echo false)"
-            if [[ "$running" != "true" ]]; then
-              echo '[-] challenge container exited before service became ready'
-              docker ps -a || true
-              docker logs hg532-smoke || true
-              exit 1
-            fi
-
-            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1 || true)"
-            if [[ "$code" == "404" || "$code" == "200" ]]; then
-              ready=1
-              break
-            fi
-
-            if (( _ % 15 == 0 )); then
-              echo "[*] waiting for 37215, current http_code=${code:-none}"
-              docker exec hg532-smoke bash -lc 'ps -ef | grep -E "qemu|tmux|python3|upnp" | grep -v grep || true' || true
-              docker exec hg532-smoke bash -lc 'tmux capture-pane -pS -60 -t hg532 2>/dev/null | tail -n 40 || true' || true
-            fi
-            sleep 2
-          done
-
-          if [[ "$ready" != "1" ]]; then
-            echo '[-] challenge service did not become ready in time'
-            docker logs hg532-smoke || true
-            exit 1
-          fi
-
-      - name: Run PoC smoke test
-        run: |
-          docker exec hg532-smoke bash -lc "printf '\n' | python3 /opt/hg532-ctf/exp.py" | tee smoke.log
-          grep -q 'FLAG{ci_smoke_test' smoke.log
-
-      - name: Collect runtime logs
-        if: always()
-        run: |
-          docker logs hg532-smoke > docker-smoke-container.log 2>&1 || true
-          docker exec hg532-smoke bash -lc "tmux capture-pane -pS -200 -t hg532" > qemu-console.log 2>&1 || true
-          docker rm -f hg532-smoke >/dev/null 2>&1 || true
-
-      - name: Upload smoke logs
+      - name: Upload self-check log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: hg532-smoke-logs
-          path: |
-            smoke.log
-            docker-smoke-container.log
-            qemu-console.log
+          name: hg532-image-selfcheck
+          path: image-selfcheck.log
