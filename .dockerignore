@@ -1,0 +1,7 @@
+.git
+.gitignore
+start.log
+start.pid
+hg532-rootfs.ext2
+__pycache__
+*.pyc
