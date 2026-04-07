@@ -32,11 +32,14 @@ fi
 qemu_args=(
     -M malta
     -m "$RAM_MB"
+    -vga none
     -kernel "$KERNEL_IMAGE"
     -drive "if=ide,index=0,media=disk,file=$DISK_IMAGE,format=qcow2"
     -append "root=/dev/sda1 console=ttyS0 nokaslr"
-    -net nic,model=pcnet
-    -net "user,hostfwd=tcp::${SSH_FWD_PORT}-:22,hostfwd=tcp::${UPNP_FWD_PORT}-:${GUEST_UPNP_PORT}"
+    # Some containerized QEMU builds do not ship the pcnet option ROM.
+    # Use -device so we can disable ROM loading explicitly.
+    -netdev "user,id=wan,hostfwd=tcp::${SSH_FWD_PORT}-:22,hostfwd=tcp::${UPNP_FWD_PORT}-:${GUEST_UPNP_PORT}"
+    -device pcnet,netdev=wan,romfile=
     -nographic
 )
 

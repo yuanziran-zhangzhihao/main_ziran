@@ -11,6 +11,7 @@ SSH_HOST="${SSH_HOST:-127.0.0.1}"
 SSH_PORT="${SSH_PORT:-2222}"
 SSH_CONNECT_TIMEOUT="${SSH_CONNECT_TIMEOUT:-5}"
 SSH_BOOT_TIMEOUT="${SSH_BOOT_TIMEOUT:-120}"
+BOOTSTRAP_VIA_SSH="${BOOTSTRAP_VIA_SSH:-0}"
 QEMU_GUEST_IFACE="${QEMU_GUEST_IFACE:-eth0}"
 QEMU_GUEST_IP="${QEMU_GUEST_IP:-10.0.2.15}"
 QEMU_GUEST_NETMASK="${QEMU_GUEST_NETMASK:-255.255.255.0}"
@@ -18,6 +19,7 @@ QEMU_GUEST_GW="${QEMU_GUEST_GW:-10.0.2.2}"
 NETWORK_SETTLE_DELAY="${NETWORK_SETTLE_DELAY:-15}"
 BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
 STEP_TIMEOUT="${STEP_TIMEOUT:-30}"
+ROUTER_START_TIMEOUT="${ROUTER_START_TIMEOUT:-60}"
 POLL_INTERVAL="${POLL_INTERVAL:-1}"
 SESSION_DIR="${SESSION_DIR:-/tmp/hg532-session}"
 CONSOLE_FIFO="${CONSOLE_FIFO:-$SESSION_DIR/console.in}"
@@ -156,7 +158,7 @@ if ! qemu_is_alive; then
     exit 1
 fi
 
-if command -v sshpass >/dev/null 2>&1 && command -v ssh >/dev/null 2>&1; then
+if [[ "$BOOTSTRAP_VIA_SSH" == "1" ]] && command -v sshpass >/dev/null 2>&1 && command -v ssh >/dev/null 2>&1; then
     build_ssh_base
     if wait_for_ssh "$SSH_BOOT_TIMEOUT"; then
         USE_SSH=1
@@ -184,15 +186,16 @@ run_cmd "mkdir -p $MOUNT_POINT"
 run_cmd "ROOTFS_DEVICE=\"$ROOTFS_DEVICE\"; if [ -z \"\$ROOTFS_DEVICE\" ]; then for candidate in /dev/sdb /dev/hdb /dev/vdb; do if [ -b \"\$candidate\" ]; then ROOTFS_DEVICE=\"\$candidate\"; break; fi; done; fi; [ -n \"\$ROOTFS_DEVICE\" ]"
 run_cmd "ROOTFS_DEVICE=\"$ROOTFS_DEVICE\"; if [ -z \"\$ROOTFS_DEVICE\" ]; then for candidate in /dev/sdb /dev/hdb /dev/vdb; do if [ -b \"\$candidate\" ]; then ROOTFS_DEVICE=\"\$candidate\"; break; fi; done; fi; grep -q ' $MOUNT_POINT ' /proc/mounts || mount -t ext2 \"\$ROOTFS_DEVICE\" $MOUNT_POINT"
 run_cmd "mkdir -p $MOUNT_POINT/proc $MOUNT_POINT/dev $MOUNT_POINT/sys"
+run_cmd "mkdir -p $MOUNT_POINT/tmp && chmod 1777 $MOUNT_POINT/tmp"
 run_cmd "grep -q ' $MOUNT_POINT/proc ' /proc/mounts || mount -t proc proc $MOUNT_POINT/proc"
 run_cmd "grep -q ' $MOUNT_POINT/dev ' /proc/mounts || mount -o bind /dev $MOUNT_POINT/dev"
 run_cmd "grep -q ' $MOUNT_POINT/sys ' /proc/mounts || mount -o bind /sys $MOUNT_POINT/sys || true"
 run_cmd "chroot $MOUNT_POINT /bin/sh -c 'killall upnp mic atmcmdd tcwdog >/dev/null 2>&1 || true; rm -f /tmp/router-init.log /tmp/mic.log /tmp/upnp.log /tmp/flag_out; /etc/profile >/tmp/router-init.log 2>&1 &'"
-run_cmd "ready=1; for _ in 1 2 3 4 5 6 7 8 9 10; do if netstat -lnt 2>/dev/null | grep -q ':$ROUTER_PORT '; then ready=0; break; fi; sleep 1; done; test \"\$ready\" -eq 0" 20
+run_cmd "ready=1; for _ in \$(seq 1 $ROUTER_START_TIMEOUT); do if netstat -lnt 2>/dev/null | grep -q ':$ROUTER_PORT '; then ready=0; break; fi; sleep 1; done; test \"\$ready\" -eq 0" $((ROUTER_START_TIMEOUT + 10))
 run_cmd "sleep $NETWORK_SETTLE_DELAY" $((NETWORK_SETTLE_DELAY + 5))
 run_cmd "ifconfig $QEMU_GUEST_IFACE $QEMU_GUEST_IP netmask $QEMU_GUEST_NETMASK up"
 run_cmd "route del default 2>/dev/null || true; route add default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE 2>/dev/null || route change default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE"
 run_cmd "ifconfig $QEMU_GUEST_IFACE | grep -q 'inet addr:$QEMU_GUEST_IP'"
-run_cmd "rm -f $MOUNT_POINT/tmp/flag_out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/flag_out ]; do sleep 1; done; killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; for _ in 1 2 3 4 5; do if ! netstat -lnt 2>/dev/null | grep -q :$ROUTER_PORT; then break; fi; sleep 1; done; cat $MOUNT_POINT/tmp/flag_out | nc -l -p $ROUTER_PORT -q 1 >/dev/null 2>&1; break; done' >/tmp/flag-relay.log 2>&1 &"
+run_cmd "rm -f $MOUNT_POINT/tmp/flag_out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/flag_out ]; do sleep 1; done; killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; for _ in 1 2 3 4 5; do if ! netstat -lnt 2>/dev/null | grep -q :$ROUTER_PORT; then break; fi; sleep 1; done; nc -l -p $ROUTER_PORT -q 1 < $MOUNT_POINT/tmp/flag_out >/dev/null 2>&1; break; done' >/tmp/flag-relay.log 2>&1 &"
 
 echo "[+] router services started inside guest"

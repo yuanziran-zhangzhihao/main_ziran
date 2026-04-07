@@ -9,6 +9,22 @@ EXTRA_MB="${EXTRA_MB:-64}"
 MIN_MB="${MIN_MB:-64}"
 ROUND_MB="${ROUND_MB:-4}"
 
+restore_exec_bits() {
+    local rel
+
+    # GitHub checkout drops execute bits for many extracted firmware files.
+    # Restore the directories the router boot chain actually executes from.
+    for rel in bin sbin lib usr/bin usr/sbin usr/lib etc/init.d; do
+        if [[ -d "$ROOTFS_DIR/$rel" ]]; then
+            find "$ROOTFS_DIR/$rel" -type f -exec chmod 0755 {} +
+        fi
+    done
+
+    if [[ -f "$ROOTFS_DIR/etc/profile" ]]; then
+        chmod 0755 "$ROOTFS_DIR/etc/profile"
+    fi
+}
+
 if [[ ! -d "$ROOTFS_DIR" ]]; then
     echo "[-] router rootfs directory not found: $ROOTFS_DIR" >&2
     exit 1
@@ -18,6 +34,8 @@ if ! command -v mkfs.ext2 >/dev/null 2>&1; then
     echo "[-] mkfs.ext2 not found" >&2
     exit 1
 fi
+
+restore_exec_bits
 
 used_kb="$(du -sk "$ROOTFS_DIR" | awk '{print $1}')"
 size_kb="$((used_kb + EXTRA_MB * 1024))"
