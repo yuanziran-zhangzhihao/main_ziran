@@ -33,7 +33,7 @@ RUN apt-get update \
 RUN curl -fsSL "$KERNEL_URL" -o vmlinux-2.6.32-5-4kc-malta \
     && curl -fsSL "$DISK_URL" -o debian_squeeze_mips_standard.qcow2
 
-COPY build_router_rootfs_image.sh boot_router.sh init_router_console.sh start.sh exp.py ./
+COPY build_router_rootfs_image.sh boot_router.sh init_router_console.sh start.sh exp.py host_relay.py ./
 COPY docker-entrypoint.sh ./
 COPY ctf ./ctf
 COPY _HG532eV100R001C01B020_upgrade_packet.bin.extracted ./_HG532eV100R001C01B020_upgrade_packet.bin.extracted

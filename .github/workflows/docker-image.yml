@@ -15,6 +15,7 @@ on:
       - 'boot_router.sh'
       - 'docker-entrypoint.sh'
       - 'exp.py'
+      - 'host_relay.py'
       - 'init_router_console.sh'
       - 'start.sh'
       - 'ctf/**'
@@ -116,6 +117,7 @@ jobs:
             boot_router.sh \
             docker-entrypoint.sh \
             exp.py \
+            host_relay.py \
             init_router_console.sh \
             start.sh \
             ctf \
@@ -132,6 +134,7 @@ jobs:
               bash -n /opt/hg532-ctf/boot_router.sh
               bash -n /opt/hg532-ctf/init_router_console.sh
               python3 -m py_compile /opt/hg532-ctf/exp.py
+              python3 -m py_compile /opt/hg532-ctf/host_relay.py
               /opt/hg532-ctf/ctf/install_guest_assets.sh
               /opt/hg532-ctf/build_router_rootfs_image.sh
               test -f /opt/hg532-ctf/hg532-rootfs.ext2
