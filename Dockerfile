@@ -17,8 +17,11 @@ RUN apt-get update \
         coreutils \
         curl \
         e2fsprogs \
+        iproute2 \
         net-tools \
+        netcat-openbsd \
         procps \
+        psmisc \
         python3 \
         openssh-client \
         python3-requests \

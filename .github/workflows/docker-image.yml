@@ -8,6 +8,7 @@ on:
       - 'v*'
     paths:
       - 'Dockerfile'
+      - 'PLATFORM_DEPLOY.md'
       - 'README.md'
       - 'build_router_rootfs_image.sh'
       - 'boot_router.sh'
@@ -122,3 +123,52 @@ jobs:
         with:
           name: hg532-image-selfcheck
           path: image-selfcheck.log
+
+      - name: Start smoke container
+        run: |
+          docker rm -f hg532-smoke >/dev/null 2>&1 || true
+          docker run -d --name hg532-smoke -p 37215:37215 -e FLAG_VALUE='FLAG{ci_smoke_test}' "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"
+
+      - name: Wait for published endpoint
+        run: |
+          ready=0
+          for _ in $(seq 1 180); do
+            http_code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1 || true)"
+            echo "[*] waiting for 37215, current http_code=${http_code}"
+            if [ "$http_code" != "000" ]; then
+              ready=1
+              break
+            fi
+            if ! docker ps --format '{{.Names}}' | grep -qx hg532-smoke; then
+              echo "[-] challenge container exited before service became ready"
+              docker ps -a
+              exit 1
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1
+
+      - name: Run end-to-end exploit smoke test
+        run: |
+          docker exec hg532-smoke python3 /opt/hg532-ctf/exp.py --host 127.0.0.1 --port 37215 --yes --ready-timeout 60 --flag-timeout 20 | tee smoke-exp.log
+          grep -q '^flag:' smoke-exp.log
+
+      - name: Collect smoke logs
+        if: always()
+        run: |
+          docker logs hg532-smoke > docker-smoke-container.log 2>&1 || true
+          docker exec hg532-smoke sh -lc 'tail -n 200 /tmp/hg532-session/console.log' > docker-smoke-console.log 2>&1 || true
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hg532-smoke-logs
+          path: |
+            smoke-exp.log
+            docker-smoke-container.log
+            docker-smoke-console.log
+
+      - name: Cleanup smoke container
+        if: always()
+        run: docker rm -f hg532-smoke >/dev/null 2>&1 || true
