@@ -65,3 +65,14 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify pull latest from GHCR
+        if: github.ref == 'refs/heads/CVE2017iot'
+        run: |
+          docker pull "${{ steps.prep.outputs.image }}:latest"
+          docker pull "${{ steps.prep.outputs.image }}:cve2017iot"
+
+      - name: Verify pull release tag from GHCR
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          docker pull "${{ steps.prep.outputs.image }}:${{ github.ref_name }}"
