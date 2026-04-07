@@ -6,12 +6,25 @@ on:
       - CVE2017iot
     tags:
       - 'v*'
+    paths:
+      - 'Dockerfile'
+      - 'README.md'
+      - 'build_router_rootfs_image.sh'
+      - 'boot_router.sh'
+      - 'docker-entrypoint.sh'
+      - 'exp.py'
+      - 'init_router_console.sh'
+      - 'start.sh'
+      - 'ctf/**'
+      - '_HG532eV100R001C01B020_upgrade_packet.bin.extracted/**'
+      - '.github/workflows/docker-image.yml'
   workflow_dispatch:
 
 env:
   PACKAGE_NAME: cve2017iot-hg532
   DOCKER_BUILD_SUMMARY: false
   DOCKER_BUILD_RECORD_UPLOAD: false
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: read
@@ -41,12 +54,15 @@ jobs:
         id: prep
         run: |
           owner="$(printf '%s' "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
-          repo="$(printf '%s' "${GITHUB_REPOSITORY##*/}" | tr '[:upper:]' '[:lower:]')"
           branch="$(printf '%s' "$GITHUB_REF_NAME" | tr '[:upper:]' '[:lower:]')"
           package="$(printf '%s' "$PACKAGE_NAME" | tr '[:upper:]' '[:lower:]')"
-          echo "repo_name=${repo}" >> "$GITHUB_OUTPUT"
           echo "image=ghcr.io/${owner}/${package}" >> "$GITHUB_OUTPUT"
           echo "branch_tag=${branch}" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/heads/CVE2017iot ]]; then
+            echo "smoke_tag=${branch}" >> "$GITHUB_OUTPUT"
+          else
+            echo "smoke_tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -86,13 +102,49 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Verify package latest from GHCR
-        if: github.ref == 'refs/heads/CVE2017iot'
-        run: |
-          docker pull "${{ steps.prep.outputs.image }}:latest"
-          docker pull "${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.branch_tag }}"
+      - name: Pull image from GHCR
+        run: docker pull "${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.smoke_tag }}"
 
-      - name: Verify package release tag from GHCR
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Start challenge container
         run: |
-          docker pull "${{ steps.prep.outputs.image }}:${{ github.ref_name }}"
+          docker rm -f hg532-smoke >/dev/null 2>&1 || true
+          docker run -d \
+            --name hg532-smoke \
+            -p 37215:37215 \
+            -e FLAG_VALUE='FLAG{ci_smoke_test}' \
+            "${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.smoke_tag }}"
+
+      - name: Wait for challenge service
+        run: |
+          ready=0
+          for _ in $(seq 1 120); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1 || true)"
+            if [[ "$code" == "404" || "$code" == "200" ]]; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1
+
+      - name: Run PoC smoke test
+        run: |
+          docker exec hg532-smoke bash -lc "printf '\n' | python3 /opt/hg532-ctf/exp.py" | tee smoke.log
+          grep -q 'FLAG{ci_smoke_test' smoke.log
+
+      - name: Collect runtime logs
+        if: always()
+        run: |
+          docker logs hg532-smoke > docker-smoke-container.log 2>&1 || true
+          docker exec hg532-smoke bash -lc "tmux capture-pane -pS -200 -t hg532" > qemu-console.log 2>&1 || true
+          docker rm -f hg532-smoke >/dev/null 2>&1 || true
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hg532-smoke-logs
+          path: |
+            smoke.log
+            docker-smoke-container.log
+            qemu-console.log
