@@ -32,6 +32,11 @@ docker run --rm -it -p 37215:37215 -e FLAG_VALUE='FLAG{your_real_flag}' hg532-ct
 
 当前 workflow 不只是构建镜像，也会拉起容器做一次黑盒 smoke test；如果失败，会额外上传 `hg532-smoke-logs` 方便排障。
 
+另外会额外上传一组可直接给平台使用的附件：
+
+- `hg532-deploy-bundles/cve2017iot-hg532-image.tar.gz`
+- `hg532-deploy-bundles/cve2017iot-platform-direct.tar.gz`
+
 注意：这套 GitHub Actions 只是一个可选分发方式，不是平台部署前提。如果你的出题平台不会从 GHCR 拉镜像，可以直接上传 `github-ready/` 目录，让平台按 `Dockerfile` 本地构建。
 
 默认镜像名：
@@ -86,6 +91,14 @@ ghcr.io/<你的 GitHub 用户名>/cve2017iot-hg532:sha-<提交短哈希>
 4. 平台镜像地址优先填 `sha-<提交短哈希>` tag，不要只填 `latest`。
 5. 如果平台有镜像缓存或“重置题目不重新拉镜像”的行为，更新题目后要强制重新拉取，不要只看“重置成功”。
 
+如果你的平台既不直接拉 GHCR，也不方便你本地手工打包，那么可以直接从 GitHub Actions 下载：
+
+1. `cve2017iot-hg532-image.tar.gz`
+适合平台支持“导入现成镜像 tar”的情况。
+
+2. `cve2017iot-platform-direct.tar.gz`
+适合平台支持“上传目录后自行构建 Dockerfile”的情况。
+
 一个可直接给平台填写的例子：
 
 ```bash
@@ -135,6 +148,7 @@ python3 exp.py
 - `github-ready/` 默认只带占位 flag，真实 flag 请在部署容器时通过 `FLAG_VALUE` 注入。
 - 出题平台如果只能开放一个端口，只开放 `37215` 即可。
 - 出题平台如果是“上传目录构建”，直接上传整个 `github-ready/` 即可。
+- 如果你走 GitHub Actions 分发，也可以直接下载 `hg532-deploy-bundles` 里的两个附件给平台用。
 - 出题平台镜像地址不要照仓库名乱填，当前 workflow 推送的是固定包名 `cve2017iot-hg532`。
 - 如果部署方平台表现异常，更常见的是平台缓存、平台无法访问 GHCR、或 package 权限问题，不一定是题目镜像本身有问题。
 - 如果你本地调试想进 guest，再额外映射 `-p 2222:2222`。

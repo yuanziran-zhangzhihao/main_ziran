@@ -102,6 +102,13 @@ jobs:
       - name: Pull exact built image
         run: docker pull "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"
 
+      - name: Export deploy bundles
+        run: |
+          docker tag "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}" "${{ steps.prep.outputs.image }}:artifact"
+          docker save "${{ steps.prep.outputs.image }}:artifact" | gzip -1 > cve2017iot-hg532-image.tar.gz
+          tar --exclude='.git' -czf cve2017iot-platform-direct.tar.gz .
+          ls -lh cve2017iot-hg532-image.tar.gz cve2017iot-platform-direct.tar.gz
+
       - name: Deterministic image self-check
         run: |
           docker run --rm             --entrypoint /bin/bash             "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}"             -lc '
@@ -123,6 +130,15 @@ jobs:
         with:
           name: hg532-image-selfcheck
           path: image-selfcheck.log
+
+      - name: Upload deploy bundles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hg532-deploy-bundles
+          path: |
+            cve2017iot-hg532-image.tar.gz
+            cve2017iot-platform-direct.tar.gz
 
       - name: Start smoke container
         run: |
