@@ -8,7 +8,6 @@ LOGIN_PASS="${LOGIN_PASS:-root}"
 MOUNT_POINT="${MOUNT_POINT:-/mnt/hg532}"
 ROOTFS_DEVICE="${ROOTFS_DEVICE:-}"
 ROUTER_PORT="${ROUTER_PORT:-37215}"
-FLAG_RELAY_PORT="${FLAG_RELAY_PORT:-31337}"
 QEMU_GUEST_IFACE="${QEMU_GUEST_IFACE:-eth0}"
 QEMU_GUEST_IP="${QEMU_GUEST_IP:-10.0.2.15}"
 QEMU_GUEST_NETMASK="${QEMU_GUEST_NETMASK:-255.255.255.0}"
@@ -55,7 +54,7 @@ run_cmd() {
     local status
 
     send_line "$cmd"
-    send_line "printf '${marker}:%s\\n' \$?"
+    send_line "printf '${marker}:%s\n' \$?"
     wait_for_regex "${marker}:[0-9]+" "$timeout"
 
     pane="$(capture_pane)"
@@ -98,6 +97,6 @@ run_cmd "sleep $NETWORK_SETTLE_DELAY" $((NETWORK_SETTLE_DELAY + 5))
 run_cmd "ifconfig $QEMU_GUEST_IFACE $QEMU_GUEST_IP netmask $QEMU_GUEST_NETMASK up"
 run_cmd "route del default 2>/dev/null || true; route add default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE 2>/dev/null || route change default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE"
 run_cmd "ifconfig $QEMU_GUEST_IFACE | grep -q 'inet addr:$QEMU_GUEST_IP'"
-run_cmd "rm -f $MOUNT_POINT/tmp/flag_out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/flag_out ]; do sleep 1; done; nc -l -p $FLAG_RELAY_PORT -q 1 < $MOUNT_POINT/tmp/flag_out; rm -f $MOUNT_POINT/tmp/flag_out; done' >/tmp/flag-relay.log 2>&1 &"
+run_cmd "rm -f $MOUNT_POINT/tmp/flag_out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/flag_out ]; do sleep 1; done; killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; for _ in 1 2 3 4 5; do if ! netstat -lnt 2>/dev/null | grep -q :$ROUTER_PORT; then break; fi; sleep 1; done; cat $MOUNT_POINT/tmp/flag_out | nc -l -p $ROUTER_PORT -q 1 >/dev/null 2>&1; break; done' >/tmp/flag-relay.log 2>&1 &"
 
 echo "[+] router services started inside guest"

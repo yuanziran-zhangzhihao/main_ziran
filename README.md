@@ -19,7 +19,7 @@ docker build -t hg532-ctf .
 ## 本地运行
 
 ```bash
-docker run --rm -it -p 37215:37215 -p 2222:2222 -p 31337:31337 -e FLAG_VALUE='FLAG{your_real_flag}' hg532-ctf
+docker run --rm -it -p 37215:37215 -e FLAG_VALUE='FLAG{your_real_flag}' hg532-ctf
 ```
 
 ## GitHub 自动构建
@@ -41,7 +41,7 @@ docker pull ghcr.io/<你的 GitHub 用户名>/<你的仓库名>:latest
 运行方式：
 
 ```bash
-docker run --rm -it -p 37215:37215 -p 2222:2222 -p 31337:31337 -e FLAG_VALUE='FLAG{your_real_flag}' ghcr.io/<你的 GitHub 用户名>/<你的仓库名>:latest
+docker run --rm -it -p 37215:37215 -e FLAG_VALUE='FLAG{your_real_flag}' ghcr.io/<你的 GitHub 用户名>/<你的仓库名>:latest
 ```
 
 ## 出题逻辑
@@ -52,7 +52,7 @@ docker run --rm -it -p 37215:37215 -p 2222:2222 -p 31337:31337 -e FLAG_VALUE='FL
 echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/check_cache.sh >/tmp/flag_out
 ```
 
-外层 relay 会把 `/tmp/flag_out` 的内容转发到 `31337`，所以仓库自带的 `exp.py` 直接回车就能拿到 flag。
+外层 relay 会在利用成功后释放 `37215`，再把 `/tmp/flag_out` 的内容从同一个 `37215` 直接回给选手，所以仓库自带的 `exp.py` 直接回车就能拿到 flag。
 
 ```bash
 python3 exp.py
@@ -61,6 +61,8 @@ python3 exp.py
 ## 注意
 
 - `github-ready/` 默认只带占位 flag，真实 flag 请在部署容器时通过 `FLAG_VALUE` 注入。
+- 出题平台如果只能开放一个端口，只开放 `37215` 即可。
+- 如果你本地调试想进 guest，再额外映射 `-p 2222:2222`。
 - 如果你手工写 PoC，不要把裸 `&` 直接塞进 `NewDownloadURL`，否则 XML 会坏。
 
 ## 自定义

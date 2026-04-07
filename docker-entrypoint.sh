@@ -16,8 +16,7 @@ RESTART_QEMU=1 TMUX_SESSION="$TMUX_SESSION" "$SCRIPT_DIR/boot_router.sh"
 
 echo "[*] container ready"
 echo "[*] service:   0.0.0.0:37215"
-echo "[*] ssh:       0.0.0.0:2222"
-echo "[*] flag:      0.0.0.0:31337"
+echo "[*] ssh(debug): container:2222 (not exposed by default)"
 echo "[*] checker:   /bin/check_cache.sh"
 echo "[*] cachefile: /tmp/ctf.cache"
 

