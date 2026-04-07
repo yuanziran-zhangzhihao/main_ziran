@@ -113,7 +113,7 @@ jobs:
             -p 37215:37215 \
             -e FLAG_VALUE='FLAG{ci_smoke_test}' \
             -e CHECK_TIMEOUT=120 \
-            -e BOOT_TIMEOUT=300 \
+            -e BOOT_TIMEOUT=600 \
             "${{ steps.prep.outputs.image }}:${{ steps.prep.outputs.smoke_tag }}"
 
       - name: Wait for challenge service
@@ -137,6 +137,7 @@ jobs:
             if (( _ % 15 == 0 )); then
               echo "[*] waiting for 37215, current http_code=${code:-none}"
               docker exec hg532-smoke bash -lc 'ps -ef | grep -E "qemu|tmux|python3|upnp" | grep -v grep || true' || true
+              docker exec hg532-smoke bash -lc 'tmux capture-pane -pS -60 -t hg532 2>/dev/null | tail -n 40 || true' || true
             fi
             sleep 2
           done

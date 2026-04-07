@@ -34,7 +34,7 @@ qemu_args=(
     -m "$RAM_MB"
     -kernel "$KERNEL_IMAGE"
     -drive "if=ide,index=0,media=disk,file=$DISK_IMAGE,format=qcow2"
-    -append "root=/dev/sda1 console=tty0 nokaslr"
+    -append "root=/dev/sda1 console=ttyS0 nokaslr"
     -net nic,model=pcnet
     -net "user,hostfwd=tcp::${SSH_FWD_PORT}-:22,hostfwd=tcp::${UPNP_FWD_PORT}-:${GUEST_UPNP_PORT}"
     -nographic

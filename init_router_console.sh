@@ -13,7 +13,7 @@ QEMU_GUEST_IP="${QEMU_GUEST_IP:-10.0.2.15}"
 QEMU_GUEST_NETMASK="${QEMU_GUEST_NETMASK:-255.255.255.0}"
 QEMU_GUEST_GW="${QEMU_GUEST_GW:-10.0.2.2}"
 NETWORK_SETTLE_DELAY="${NETWORK_SETTLE_DELAY:-15}"
-BOOT_TIMEOUT="${BOOT_TIMEOUT:-180}"
+BOOT_TIMEOUT="${BOOT_TIMEOUT:-600}"
 STEP_TIMEOUT="${STEP_TIMEOUT:-30}"
 POLL_INTERVAL="${POLL_INTERVAL:-1}"
 
@@ -37,6 +37,7 @@ wait_for_regex() {
     done
 
     echo "[-] timed out waiting for pattern: $regex" >&2
+    printf "%s\n" "$pane" | tail -n 80 >&2
     return 1
 }
 
