@@ -134,10 +134,16 @@ python3 exp.py --host <题目IP> --port 37215 --yes --ready-timeout 120 --flag-t
 选手利用 CVE-2017-17215 获得命令执行后，写入缓存并调用校验脚本：
 
 ```sh
-echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/check_cache.sh >/tmp/flag_out
+echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/report_flag.sh
 ```
 
-外层 relay 会在利用成功后释放 `37215`，再把 `/tmp/flag_out` 的内容从同一个 `37215` 直接回给选手，所以仓库自带的 `exp.py` 直接回车就能拿到 flag。
+当前单端口链路不是 guest 去抢回 `37215`，而是容器侧常驻一个 host relay：
+
+- 普通 HTTP 请求继续转发给 guest 内的 UPnP
+- exploit 成功后，guest 用 BusyBox `wget` 把 flag 回连给容器内 callback
+- 之后选手再访问同一个 `37215`，host relay 直接把 flag 回给选手
+
+这样平台只开一个端口也能稳定出 flag，不依赖 guest 内去重绑对外端口。
 
 ```bash
 python3 exp.py
@@ -152,6 +158,7 @@ python3 exp.py
 - 出题平台镜像地址不要照仓库名乱填，当前 workflow 推送的是固定包名 `cve2017iot-hg532`。
 - 如果部署方平台表现异常，更常见的是平台缓存、平台无法访问 GHCR、或 package 权限问题，不一定是题目镜像本身有问题。
 - 如果你本地调试想进 guest，再额外映射 `-p 2222:2222`。
+- `ctf/guest/` 里的 helper 脚本不要默认 `tr`、`printf`、`sync` 这些 applet 一定存在，尽量只用固件里已验证存在的命令，或显式走 `/bin/busybox`。
 - 如果你手工写 PoC，不要把裸 `&` 直接塞进 `NewDownloadURL`，否则 XML 会坏。
 - 旧版本地调试文档里提到的 `tmux attach` 只属于历史调试方式，不再是当前平台运行前提。
 

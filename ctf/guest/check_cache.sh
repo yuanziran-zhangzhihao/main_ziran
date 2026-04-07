@@ -14,8 +14,8 @@ if [ ! -f "$EXPECTED_FILE" ] || [ ! -f "$FLAG_FILE" ]; then
     exit 1
 fi
 
-cache_value="$(tr -d '\r\n' < "$CACHE_FILE")"
-expected_value="$(tr -d '\r\n' < "$EXPECTED_FILE")"
+cache_value="$(cat "$CACHE_FILE")"
+expected_value="$(cat "$EXPECTED_FILE")"
 
 if [ "$cache_value" != "$expected_value" ]; then
     echo "cache mismatch"
