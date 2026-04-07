@@ -179,9 +179,11 @@ jobs:
           done
           test "$ready" -eq 1
 
-      - name: Run end-to-end exploit smoke test
+      - name: Run black-box exploit smoke test
         run: |
-          docker exec hg532-smoke python3 /opt/hg532-ctf/exp.py --host 127.0.0.1 --port 37215 --yes --ready-timeout 60 --flag-timeout 20 | tee smoke-exp.log
+          docker run --rm --network host --entrypoint python3 \
+            "${{ steps.prep.outputs.image }}@${{ steps.build.outputs.digest }}" \
+            /opt/hg532-ctf/exp.py --host 127.0.0.1 --port 37215 --yes --ready-timeout 60 --flag-timeout 30 | tee smoke-exp.log
           grep -q '^flag:' smoke-exp.log
 
       - name: Collect smoke logs
