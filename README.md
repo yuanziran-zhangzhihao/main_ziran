@@ -97,7 +97,7 @@ ghcr.io/<你的 GitHub 用户名>/cve2017iot-hg532:sha-<提交短哈希>
 适合平台支持“导入现成镜像 tar”的情况。
 
 2. `cve2017iot-platform-direct.tar.gz`
-适合平台支持“上传目录后自行构建 Dockerfile”的情况。
+适合平台支持“上传目录后自行构建 Dockerfile”，并且平台本身能正常拉基础镜像和安装依赖的情况。
 
 一个可直接给平台填写的例子：
 
