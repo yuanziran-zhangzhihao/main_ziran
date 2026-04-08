@@ -8,7 +8,8 @@ on:
 
 env:
   NAME: pwn-weboverflow
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-weboverflow:latest
+  IMAGE_LATEST: ghcr.io/${{ github.repository_owner }}/pwn-weboverflow:latest
+  IMAGE_SHA: ghcr.io/${{ github.repository_owner }}/pwn-weboverflow:sha-${{ github.sha }}
 
 jobs:
   challenge-build:
@@ -31,6 +32,9 @@ jobs:
           test -f pwn-weboverflow/build/src/pwn
           test -f pwn-weboverflow/build/src/server
           test -f pwn-weboverflow/build/src/start.sh
+          test -f pwn-weboverflow/selftest/smoke.py
+          test -f README.md
+          test -f pwn-weboverflow/PLATFORM_DEPLOY.md
 
       - name: Login to ghcr.io
         uses: docker/login-action@v3
@@ -44,17 +48,28 @@ jobs:
         with:
           context: ./pwn-weboverflow/build
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: |
+            ${{ env.IMAGE_LATEST }}
+            ${{ env.IMAGE_SHA }}
 
-      - name: Pull image for post-build
-        run: docker pull ${{ env.IMAGE }}
+      - name: Pull image for validation
+        run: docker pull ${{ env.IMAGE_SHA }}
+
+      - name: Smoke test published image
+        run: |
+          set -euo pipefail
+          CONTAINER_NAME=pwn-weboverflow-smoke
+          docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+          docker run -d --name "$CONTAINER_NAME" -p 18000:8000 -e 'FLAG_VALUE=FLAG{smoke_test}' ${{ env.IMAGE_SHA }}
+          trap 'docker logs "$CONTAINER_NAME" || true; docker rm -f "$CONTAINER_NAME" || true' EXIT
+          python3 pwn-weboverflow/selftest/smoke.py --host 127.0.0.1 --port 18000 --timeout 20
 
       - name: Run post-build script
         working-directory: pwn-weboverflow/build
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           NAME: ${{ env.NAME }}
-          IMAGE_TAG: ${{ env.IMAGE }}
+          IMAGE_TAG: ${{ env.IMAGE_SHA }}
         run: |
           chmod +x post-build.sh
           ./post-build.sh
@@ -67,11 +82,25 @@ jobs:
           test -f pwn-weboverflow/attachments/ld-linux-x86-64.so.2
           ls -lh pwn-weboverflow/attachments
 
+      - name: Build platform direct bundle
+        run: |
+          tar czf pwn-weboverflow-platform-direct.tar.gz \
+            README.md \
+            pwn-weboverflow/PLATFORM_DEPLOY.md \
+            pwn-weboverflow/build \
+            pwn-weboverflow/selftest
+
       - name: Upload attachments
         uses: actions/upload-artifact@v4
         with:
           name: pwn-weboverflow-attachments
           path: pwn-weboverflow/attachments/
+
+      - name: Upload platform bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwn-weboverflow-platform-direct
+          path: pwn-weboverflow-platform-direct.tar.gz
 
   prune-old-images:
     runs-on: ubuntu-latest
