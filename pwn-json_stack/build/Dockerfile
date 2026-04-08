@@ -1,8 +1,6 @@
 FROM ubuntu:22.04
 
-# Keep only the repositories needed for runtime packages and avoid flaky backports.
-RUN sed -i '/xenial-backports/d' /etc/apt/sources.list && \
-    apt-get update && \
+RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         socat \
         ca-certificates && \
@@ -15,12 +13,13 @@ WORKDIR /home/ctf
 
 COPY src/pwn /home/ctf/pwn
 COPY src/start.sh /start.sh
+COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
 
 # The binary is patched to use:
 # - interpreter: ./ld-linux-x86-64.so.2
 # - NEEDED:      ./libc.so.6
 # so both files must exist at the root of the chroot.
-RUN chmod 0755 /home/ctf/pwn /start.sh && \
+RUN chmod 0755 /home/ctf/pwn /start.sh /usr/local/bin/challenge-entry && \
     mkdir -p /home/ctf/bin /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64 && \
     cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/libc.so.6 && \
     cp /lib64/ld-linux-x86-64.so.2 /home/ctf/ld-linux-x86-64.so.2 && \

@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 
+PORT="${PORT:-8000}"
 FLAG_VALUE="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
 
 if [ -n "${A1CTF_FLAG:-}" ]; then
@@ -21,6 +22,8 @@ printf '%s' "$FLAG_VALUE" > /home/ctf/flag
 chown ctf:ctf /home/ctf/flag
 chmod 0400 /home/ctf/flag
 
+echo "[*] pwn-json_stack service listening on ${PORT}"
+
 # The challenge is a one-shot stdin/stdout program, not a self-listening daemon.
 # Keep socat as PID 1 and spawn a fresh chrooted instance for each TCP connection.
-exec socat -T60 TCP-LISTEN:8000,reuseaddr,fork EXEC:'/usr/sbin/chroot --userspec=ctf /home/ctf /pwn',stderr
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:'/usr/local/bin/challenge-entry',stderr
