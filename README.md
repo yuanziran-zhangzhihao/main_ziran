@@ -104,10 +104,37 @@ make
 http://127.0.0.1:8080/
 ```
 
+如果要模拟平台注入 flag，可以直接：
+
+```bash
+FLAG_VALUE='flag{local_demo}' ./routerd
+```
+
+## Docker Run
+
+```bash
+make clean && make STATIC=1
+docker build -t pwn-router .
+docker run --rm -p 8080:8080 -e 'FLAG_VALUE=flag{local_demo}' pwn-router
+```
+
+或者：
+
+```bash
+make clean && make STATIC=1
+FLAG_VALUE='flag{local_demo}' docker compose up --build -d
+```
+
 ## Reference Solve
 
 ```bash
 python3 solve.py
+```
+
+也可以指定目标和校验值，用于 smoke test：
+
+```bash
+python3 solve.py --host 127.0.0.1 --port 8080 --expect 'flag{local_demo}'
 ```
 
 ## Why It Works Well For Beginners
@@ -119,3 +146,10 @@ python3 solve.py
 - 不需要 ROP
 - 不需要地址泄露
 - 不需要复杂调试技巧
+
+## Deployment Notes
+
+- 容器只对外暴露 `8080/tcp`
+- 真实 flag 应通过运行时环境变量 `FLAG_VALUE` 或 `FLAG` 注入
+- 源码内的默认 flag 仅用于本地演示，不应用于正式部署
+- Docker 镜像使用预编译静态 `routerd`，构建前先执行 `make STATIC=1`

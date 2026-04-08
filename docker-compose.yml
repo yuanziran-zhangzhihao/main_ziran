@@ -3,6 +3,8 @@ name: pwn-router
 services:
   router:
     build: .
+    environment:
+      FLAG_VALUE: ${FLAG_VALUE:-flag_demo_router_local}
     ports:
       - "8080:8080"
     restart: unless-stopped

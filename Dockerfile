@@ -1,17 +1,7 @@
-FROM ubuntu:22.04
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        build-essential \
-        curl \
-        make \
-    && rm -rf /var/lib/apt/lists/*
+FROM scratch
 
 WORKDIR /app
-COPY . /app
-RUN make
+COPY routerd /app/routerd
 
 EXPOSE 8080
-CMD ["./routerd"]
+CMD ["/app/routerd"]

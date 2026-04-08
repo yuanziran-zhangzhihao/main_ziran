@@ -15,7 +15,8 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-router:latest
+  IMAGE_REPO: ghcr.io/${{ github.repository_owner }}/pwn-router
+  IMAGE_SHA_TAG: sha-${{ github.sha }}
 
 jobs:
   challenge-build:
@@ -36,6 +37,12 @@ jobs:
           test -f Makefile
           test -f solve.py
 
+      - name: Build static binary
+        run: |
+          make clean
+          make STATIC=1
+          file routerd
+
       - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
@@ -48,23 +55,46 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: |
+            ${{ env.IMAGE_REPO }}:latest
+            ${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}
 
-      - name: Pull image for artifact extraction
-        run: docker pull ${{ env.IMAGE }}
+      - name: Pull image for smoke test and artifact extraction
+        run: docker pull ${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}
+
+      - name: Smoke test published image
+        run: |
+          docker run -d --name pwn-router-smoke \
+            -p 18080:8080 \
+            -e 'FLAG_VALUE=flag{smoke_test_router}' \
+            ${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:18080/ >/dev/null
+          python3 solve.py --host 127.0.0.1 --port 18080 --expect 'flag{smoke_test_router}'
+
+      - name: Dump smoke logs on failure
+        if: failure()
+        run: docker logs pwn-router-smoke || true
+
+      - name: Remove smoke container
+        if: always()
+        run: docker rm -f pwn-router-smoke || true
 
       - name: Export challenge bundle
         run: |
           mkdir -p dist
-          docker run --rm -v "$PWD/dist:/out" ${{ env.IMAGE }} /bin/sh -c '
-            cp /app/routerd /out/routerd &&
-            cp /app/routerd.c /out/routerd.c &&
-            cp /app/README.md /out/README.md &&
-            cp /app/solve.py /out/solve.py &&
-            cp /app/run.sh /out/run.sh &&
-            cp /app/Dockerfile /out/Dockerfile &&
-            cp /app/docker-compose.yml /out/docker-compose.yml
-          '
+          cp routerd dist/routerd
+          cp routerd.c dist/routerd.c
+          cp README.md dist/README.md
+          cp solve.py dist/solve.py
+          cp run.sh dist/run.sh
+          cp Dockerfile dist/Dockerfile
+          cp docker-compose.yml dist/docker-compose.yml
           tar -czf dist/pwn-router-bundle.tar.gz \
             -C dist \
             routerd routerd.c README.md solve.py run.sh Dockerfile docker-compose.yml

@@ -14,7 +14,16 @@
 #define RECV_BUF_SIZE 8192
 #define BODY_BUF_SIZE 4096
 
-static const char *FLAG = "flag{router_stack_overflow_for_beginners}";
+static const char *get_flag(void)
+{
+    const char *flag = getenv("FLAG_VALUE");
+
+    if (!flag || !*flag)
+        flag = getenv("FLAG");
+    if (!flag || !*flag)
+        flag = "flag{demo_router_flag}";
+    return flag;
+}
 
 static const char *INDEX_HTML =
 "<!DOCTYPE html>\n"
@@ -225,7 +234,7 @@ static void send_diag_response(int fd)
 
     snprintf(body, sizeof(body),
              "{\n  \"status\": \"ok\",\n  \"service\": \"wireless\",\n  \"diag\": \"enabled\",\n  \"flag\": \"%s\"\n}\n",
-             FLAG);
+             get_flag());
     send_response(fd, "200 OK", "application/json", body);
 }
 
