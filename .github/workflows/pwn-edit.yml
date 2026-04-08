@@ -9,37 +9,40 @@ on:
   workflow_dispatch:
 
 env:
-  NAME: pwn-edit  # 项目名称（和目录名一致）
-  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}  # 镜像前缀，例如 ghcr.io/yuanziran-zhangzhihao
+  NAME: pwn-edit
 
 jobs:
   challenge-build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write  # 推送容器镜像到 GHCR 所需
-      id-token: write
+      packages: write
 
     steps:
-      # 1. 拉取代码
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           lfs: true
           submodules: true
 
-      # 2. 检查 Dockerfile 是否存在
+      - name: Prepare image vars
+        id: vars
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/${NAME}"
+          short_sha="${GITHUB_SHA::7}"
+          echo "image=${image}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+
       - name: Check Dockerfile
         run: |
           dockerfile_path="${{ env.NAME }}/build/Dockerfile"
-          echo "Looking for Dockerfile at: $dockerfile_path"
-          if [ ! -f "$dockerfile_path" ]; then
-            echo "❌ Dockerfile not found!"
-            exit 1
-          fi
-          echo "✅ Dockerfile found at: $(pwd)/$dockerfile_path"
+          test -f "$dockerfile_path"
+          test -f "${{ env.NAME }}/build/src/pwn"
+          test -f "${{ env.NAME }}/build/src/start.sh"
+          test -f "${{ env.NAME }}/build/src/challenge-entry.sh"
+          test -f "${{ env.NAME }}/build/post-build.sh"
+          test -f "${{ env.NAME }}/build/smoke.py"
 
-      # 3. 登录 GHCR
       - name: Login to ghcr.io
         uses: docker/login-action@v3
         with:
@@ -47,57 +50,101 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # 4. 构建并推送镜像
       - name: Build and push image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: ${{ env.NAME }}/build
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ steps.vars.outputs.image }}:latest
+            ${{ steps.vars.outputs.image }}:sha-${{ steps.vars.outputs.short_sha }}
 
-      # 5. 运行 post-build 脚本（提取附件等）
+      - name: Pull image for artifact generation
+        run: docker pull ${{ steps.vars.outputs.image }}:sha-${{ steps.vars.outputs.short_sha }}
+
       - name: Run post-build script
         working-directory: ${{ env.NAME }}/build
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           NAME: ${{ env.NAME }}
-          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+          IMAGE_TAG: ${{ steps.vars.outputs.image }}:sha-${{ steps.vars.outputs.short_sha }}
         run: |
           chmod +x post-build.sh
           ./post-build.sh
 
-      # 6. 上传附件到 Artifacts
+      - name: Check generated attachments
+        run: |
+          test -f ${{ env.NAME }}/attachments/pwn
+          test -f ${{ env.NAME }}/attachments/libc.so.6
+          test -f ${{ env.NAME }}/attachments/ld-linux-x86-64.so.2
+          test -f ${{ env.NAME }}/attachments/README.md
+          test -f ${{ env.NAME }}/attachments/pwn-edit.tar.gz
+          ls -lh ${{ env.NAME }}/attachments
+
+      - name: Start smoke container
+        run: |
+          docker rm -f pwn-edit-smoke >/dev/null 2>&1 || true
+          docker run -d --name pwn-edit-smoke -p 8000:8000 -e 'FLAG_VALUE=FLAG{ci_smoke_test}' \
+            ${{ steps.vars.outputs.image }}:sha-${{ steps.vars.outputs.short_sha }}
+
+      - name: Wait for tcp service
+        run: |
+          ready=0
+          for _ in $(seq 1 60); do
+            if nc -z 127.0.0.1 8000; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+      - name: Run smoke exploit
+        run: |
+          python3 ${{ env.NAME }}/build/smoke.py --host 127.0.0.1 --port 8000 --expect 'FLAG{ci_smoke_test}' \
+            | tee smoke.log
+
+      - name: Capture smoke container log
+        if: always()
+        run: docker logs pwn-edit-smoke > smoke-container.log 2>&1 || true
+
       - name: Upload attachments
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.NAME }}-attachments
           path: ${{ env.NAME }}/attachments/
 
-  # 清理旧的 GHCR 镜像版本（关键：只传包名，不带用户名前缀！）
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}-smoke
+          path: |
+            smoke.log
+            smoke-container.log
+
+      - name: Cleanup smoke container
+        if: always()
+        run: docker rm -f pwn-edit-smoke >/dev/null 2>&1 || true
+
   prune-old-images:
     runs-on: ubuntu-latest
     needs: challenge-build
-    if: always()  # 无论构建成功与否都尝试清理
+    if: always()
     permissions:
       packages: write
 
     steps:
-      # 1. 获取小写的纯包名（仅项目名，不含 owner）
-      - name: Get package name (lowercase)
-        id: pkg
-        run: |
-          pkg_name=$(echo '${{ env.NAME }}' | tr '[:upper:]' '[:lower:]')
-          echo "pkg_name=$pkg_name" >> "$GITHUB_OUTPUT"
-          echo "Using package name: $pkg_name"
-
-      # 2. 调用清理 action（dry-run 模式用于预览）
       - name: Clean old images
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          owner: ${{ github.repository_owner }}     # 用户名，如 yuanziran-zhangzhihao
-          package: ${{ steps.pkg.outputs.pkg_name }} # 仅包名，如 pwn-edit
-          exclude-tags: latest                      # 保留 latest 标签
-          dry-run: true                             # 先预览，确认无误后改为 false
-          delete-untagged: true                     # 删除未标记的版本
-          delete-ghost-images: true                 # 删除幽灵镜像
+          owner: ${{ github.repository_owner }}
+          package: pwn-edit
+          exclude-tags: latest
+          dry-run: true
+          delete-untagged: true
+          delete-ghost-images: true

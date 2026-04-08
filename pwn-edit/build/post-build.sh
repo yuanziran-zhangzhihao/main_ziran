@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==============================================
 # 配置区：根据实际环境调整（通常无需修改）
@@ -64,6 +65,29 @@ copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
 
 # 复制 ld-linux 加载器
 copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
+
+cat > "$ATTACHMENTS_DIR/README.md" <<'EOF'
+# pwn-edit attachments
+
+Files:
+- `pwn`
+- `libc.so.6`
+- `ld-linux-x86-64.so.2`
+
+Suggested local run:
+
+```bash
+chmod +x pwn
+./ld-linux-x86-64.so.2 --library-path . ./pwn
+```
+
+Remote service:
+- TCP port `8000`
+- Flag file path inside the challenge runtime: `/flag`
+EOF
+
+tar -C "$ATTACHMENTS_DIR" -czf "$ATTACHMENTS_DIR/pwn-edit.tar.gz" \
+    pwn libc.so.6 ld-linux-x86-64.so.2 README.md
 
 # 5. 清理临时容器
 docker rm -v "$CONTAINER_ID" &> /dev/null

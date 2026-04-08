@@ -13,7 +13,8 @@ RUN groupadd -r ctf && useradd -r -g ctf ctf && \
 
 # 复制启动脚本（假设 start.sh 在 src/ 中）
 COPY src/start.sh /start.sh
-RUN chmod +x /start.sh
+COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
+RUN chmod +x /start.sh /usr/local/bin/challenge-entry
 
 WORKDIR /home/ctf
 
