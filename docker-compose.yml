@@ -1,11 +1,11 @@
-name: babyioctl
+name: core_level0
 
 services:
-  builder:
+  challenge:
     build:
       context: .
       dockerfile: Dockerfile
-    working_dir: /work
-    volumes:
-      - ./:/work
-    command: ["/usr/local/bin/challenge-build"]
+    ports:
+      - "1337:1337"
+    environment:
+      FLAG: FLAG{local_docker_demo}

@@ -9,5 +9,9 @@
 Module.symvers
 modules.order
 exp
+exp.static
 .tmp_versions/
 .cache/
+attachments/
+smoke/
+*.log

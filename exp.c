@@ -30,6 +30,33 @@ static void hex_dump(const unsigned char *buf, size_t len)
 		printf("\n");
 }
 
+static void print_flag_candidates(const unsigned char *buf, size_t len)
+{
+	size_t i;
+	int found = 0;
+
+	for (i = 0; i < len; i++) {
+		size_t j;
+
+		if (buf[i] < 0x20 || buf[i] > 0x7e)
+			continue;
+
+		for (j = i; j < len && buf[j] >= 0x20 && buf[j] <= 0x7e; j++)
+			;
+
+		if (memchr(buf + i, '{', j - i) != NULL &&
+		    memchr(buf + i, '}', j - i) != NULL) {
+			printf("[+] candidate = %.*s\n", (int)(j - i), buf + i);
+			found = 1;
+		}
+
+		i = j;
+	}
+
+	if (!found)
+		printf("[-] no printable {...} candidate found in leak\n");
+}
+
 int main(void)
 {
 	int fd;
@@ -38,7 +65,6 @@ int main(void)
 	struct baby_req req = {
 		.buf = (char *)leak,
 	};
-	char *flag_pos;
 
 	memset(leak, 0, sizeof(leak));
 
@@ -62,12 +88,7 @@ int main(void)
 
 	printf("[+] leaked %zu bytes\n", leak_size);
 	hex_dump(leak, leak_size);
-
-	flag_pos = strstr((char *)leak, "flag{");
-	if (flag_pos != NULL)
-		printf("[+] flag = %s\n", flag_pos);
-	else
-		printf("[-] flag not found in leak\n");
+	print_flag_candidates(leak, leak_size);
 
 	close(fd);
 	return 0;

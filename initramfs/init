@@ -9,12 +9,32 @@
 echo 1 > /proc/sys/kernel/kptr_restrict 2>/dev/null || true
 echo 1 > /proc/sys/kernel/dmesg_restrict 2>/dev/null || true
 
-/bin/insmod /babydriver.ko
+FLAG_FILE="/etc/challenge.flag"
+FLAG_VALUE="flag{local_bundle_placeholder}"
+
+if [ -r "$FLAG_FILE" ]; then
+	FLAG_VALUE="$(/bin/cat "$FLAG_FILE")"
+	/bin/chmod 0000 "$FLAG_FILE" 2>/dev/null || true
+	/bin/rm -f "$FLAG_FILE" 2>/dev/null || true
+fi
+
+/bin/insmod /babydriver.ko flag_value="$FLAG_VALUE"
+
+if [ -c /dev/babyioctl ]; then
+	/bin/chown 1000:1000 /dev/babyioctl 2>/dev/null || true
+	/bin/chmod 0600 /dev/babyioctl 2>/dev/null || true
+fi
 
 echo
 echo "[+] babyioctl challenge booted"
 echo "[+] device: /dev/babyioctl"
 echo "[+] objective: leak the in-kernel flag with ioctl OOB read"
+echo "[+] shell: ctf user"
+echo "[+] upload helper: /bin/b64dec"
 echo
 
-exec /bin/sh
+export HOME="/home/ctf"
+export USER="ctf"
+export LOGNAME="ctf"
+
+exec /bin/setsid /bin/cttyhack /bin/launch-ctf

@@ -21,4 +21,6 @@ qemu-system-x86_64 \
     -append "console=ttyS0 loglevel=3 oops=panic panic=1 nokaslr pti=off quiet" \
     -nographic \
     -monitor /dev/null \
+    -snapshot \
+    -net none \
     -no-reboot

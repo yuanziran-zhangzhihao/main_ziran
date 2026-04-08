@@ -6,7 +6,7 @@ PWD := $(shell pwd)
 CC ?= gcc
 CFLAGS += -O2 -Wall
 
-.PHONY: all module exp clean
+.PHONY: all module exp exp-static clean
 
 all: module exp
 
@@ -16,7 +16,10 @@ module:
 exp: exp.c
 	$(CC) $(CFLAGS) -o exp exp.c
 
+exp-static: exp.c
+	$(CC) $(CFLAGS) -static -o exp.static exp.c
+
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
-	$(RM) exp
+	$(RM) exp exp.static
 endif

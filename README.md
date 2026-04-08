@@ -4,11 +4,10 @@
 
 `babyioctl` is a beginner-friendly kernel pwn challenge built around an out-of-bounds read in `ioctl`.
 
-The final release format is the usual CTF kernel bundle:
+This branch now supports both delivery paths:
 
-- `bzImage`
-- `rootfs.cpio.gz`
-- `run.sh`
+- player attachments: `bzImage`, `rootfs.cpio.gz`, `run.sh`
+- platform deployment: single-port Docker container on `1337/tcp`
 
 ## Vulnerability
 
@@ -25,27 +24,35 @@ That means the intended solve is to set the read size to `0x80` and leak both bu
 
 - `babydriver.c`: vulnerable kernel module
 - `exp.c`: local reference exploit
-- `initramfs/init`: init script used inside the CTF rootfs
-- `docker/build.sh`: builds the full CTF bundle
-- `docker-compose.yml`: Docker entrypoint for one-command packaging
-- `run.sh`: launches the challenge in QEMU
+- `initramfs/init`: guest init script
+- `docker/build.sh`: builds the kernel bundle and helper artifacts
+- `docker/start.sh`: prepares a runtime initramfs with the real flag and starts the TCP service
+- `docker/session.sh`: launches one QEMU session per connection
+- `docker/smoke.py`: black-box smoke test against the exposed TCP service
+- `run.sh`: local QEMU launcher for the player attachment bundle
 
-## Build The CTF Bundle
+## Player Attachment Bundle
 
 ```bash
-docker compose up --build builder
+docker build -t core_level0:local .
+cid="$(docker create core_level0:local)"
+mkdir -p attachments
+docker cp "$cid:/opt/core_level0/attachments/." ./attachments/
+docker rm -v "$cid"
 ```
 
-This produces:
+This exports:
 
 - `bzImage`
 - `rootfs.cpio.gz`
-- `babydriver.ko`
-- `exp`
+- `run.sh`
+- `babydriver.c`
+- `exp.c`
+- `README.md`
 
-The Docker image installs an Ubuntu generic kernel and matching headers, so the generated `bzImage` and `babydriver.ko` are built for the same kernel version.
+The attachment bundle uses a placeholder local flag. The real platform flag is injected at container runtime.
 
-## Run The Challenge
+## Run The Local Bundle
 
 Requirements on the host:
 
@@ -54,20 +61,38 @@ Requirements on the host:
 Then run:
 
 ```bash
+cd attachments
 ./run.sh
 ```
 
-The VM boots directly into a shell and auto-loads the vulnerable module.
+The VM boots into a `ctf` shell and auto-loads the vulnerable module.
+
+## Run The Docker Service
+
+```bash
+docker compose up --build challenge
+```
+
+Then connect:
+
+```bash
+nc 127.0.0.1 1337
+```
+
+The remote service also lands in the guest serial console as `ctf`.
 
 ## Solve Path
 
 1. Open `/dev/babyioctl`
 2. Use `BABY_IOCTL_SET_SIZE` to set the read size to `0x80`
 3. Use `BABY_IOCTL_READ` to leak memory
-4. Search the leaked buffer for `flag{`
+4. Search the leaked buffer for the printable `{...}` candidate
+
+For remote play, upload a prebuilt static exploit into the guest with `/bin/b64dec`.
 
 ## Notes
 
 - This challenge is intentionally simple and deterministic
 - There is no race condition, UAF, ROP, or privilege escalation path
-- It is suitable as a first kernel pwn challenge or warm-up problem
+- The platform container exposes only one port
+- The runtime flag is injected when the Docker container starts

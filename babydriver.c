@@ -23,6 +23,8 @@ struct baby_blob {
 
 static struct baby_blob g_blob;
 static size_t g_read_size = sizeof(g_blob.note);
+static char flag_value[sizeof(g_blob.flag)] = "flag{local_bundle_placeholder}";
+module_param_string(flag_value, flag_value, sizeof(flag_value), 0000);
 
 static long baby_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -65,18 +67,17 @@ static struct miscdevice baby_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
 	.name = DEVICE_NAME,
 	.fops = &baby_fops,
-	.mode = 0666,
+	.mode = 0600,
 };
 
 static int __init baby_init(void)
 {
 	int ret;
-	const char *flag = "flag{easy_kernel_ioctl_oob_read}";
 
 	memset(&g_blob, 'A', sizeof(g_blob));
 	memcpy(g_blob.note, "Baby's first kernel leak. Read more than 0x40 bytes.",
 	       51);
-	memcpy(g_blob.flag, flag, strlen(flag) + 1);
+	strscpy(g_blob.flag, flag_value, sizeof(g_blob.flag));
 
 	ret = misc_register(&baby_dev);
 	if (ret)
