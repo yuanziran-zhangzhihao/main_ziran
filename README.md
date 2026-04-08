@@ -134,7 +134,7 @@ python3 exp.py --host <题目IP> --port 37215 --yes --ready-timeout 120 --flag-t
 选手利用 CVE-2017-17215 获得命令执行后，写入缓存并调用校验脚本：
 
 ```sh
-echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/report_flag.sh
+echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/diag_sync.sh
 ```
 
 当前单端口链路不是 guest 去抢回 `37215`，而是容器侧常驻一个 host relay：

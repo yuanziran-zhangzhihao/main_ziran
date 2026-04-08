@@ -190,12 +190,12 @@ run_cmd "mkdir -p $MOUNT_POINT/tmp && chmod 1777 $MOUNT_POINT/tmp"
 run_cmd "grep -q ' $MOUNT_POINT/proc ' /proc/mounts || mount -t proc proc $MOUNT_POINT/proc"
 run_cmd "grep -q ' $MOUNT_POINT/dev ' /proc/mounts || mount -o bind /dev $MOUNT_POINT/dev"
 run_cmd "grep -q ' $MOUNT_POINT/sys ' /proc/mounts || mount -o bind /sys $MOUNT_POINT/sys || true"
-run_cmd "chroot $MOUNT_POINT /bin/sh -c 'killall upnp mic atmcmdd tcwdog >/dev/null 2>&1 || true; rm -f /tmp/router-init.log /tmp/mic.log /tmp/upnp.log /tmp/flag_out; /etc/profile >/tmp/router-init.log 2>&1 &'"
+run_cmd "chroot $MOUNT_POINT /bin/sh -c 'killall upnp mic atmcmdd tcwdog >/dev/null 2>&1 || true; rm -f /tmp/router-init.log /tmp/mic.log /tmp/upnp.log /tmp/diag.out; /etc/profile >/tmp/router-init.log 2>&1 &'"
 run_cmd "ready=1; for _ in \$(seq 1 $ROUTER_START_TIMEOUT); do if netstat -lnt 2>/dev/null | grep -q ':$ROUTER_PORT '; then ready=0; break; fi; sleep 1; done; test \"\$ready\" -eq 0" $((ROUTER_START_TIMEOUT + 10))
 run_cmd "sleep $NETWORK_SETTLE_DELAY" $((NETWORK_SETTLE_DELAY + 5))
 run_cmd "ifconfig $QEMU_GUEST_IFACE $QEMU_GUEST_IP netmask $QEMU_GUEST_NETMASK up"
 run_cmd "route del default 2>/dev/null || true; route add default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE 2>/dev/null || route change default gw $QEMU_GUEST_GW dev $QEMU_GUEST_IFACE"
 run_cmd "ifconfig $QEMU_GUEST_IFACE | grep -q 'inet addr:$QEMU_GUEST_IP'"
-run_cmd "rm -f $MOUNT_POINT/tmp/flag_out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/flag_out ]; do sleep 1; done; while netstat -lnt 2>/dev/null | grep -q :$ROUTER_PORT; do killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; sleep 1; done; until nc -l -p $ROUTER_PORT -q 1 < $MOUNT_POINT/tmp/flag_out; do killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; sleep 1; done; break; done' >/tmp/flag-relay.log 2>&1 &"
+run_cmd "rm -f $MOUNT_POINT/tmp/diag.out /tmp/flag-relay.log; sh -c 'while true; do while [ ! -s $MOUNT_POINT/tmp/diag.out ]; do sleep 1; done; while netstat -lnt 2>/dev/null | grep -q :$ROUTER_PORT; do killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; sleep 1; done; until nc -l -p $ROUTER_PORT -q 1 < $MOUNT_POINT/tmp/diag.out; do killall upnp >/dev/null 2>&1 || true; killall mic >/dev/null 2>&1 || true; sleep 1; done; break; done' >/tmp/flag-relay.log 2>&1 &"
 
 echo "[+] router services started inside guest"

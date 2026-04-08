@@ -45,7 +45,8 @@ RUN chmod +x \
     start.sh \
     docker-entrypoint.sh \
     ctf/install_guest_assets.sh \
-    ctf/guest/check_cache.sh
+    ctf/guest/check_cache.sh \
+    ctf/guest/diag_sync.sh
 
 EXPOSE 37215
 HEALTHCHECK --interval=20s --timeout=5s --start-period=60s --retries=3 CMD curl -sS -o /dev/null http://127.0.0.1:37215/ctrlt/DeviceUpgrade_1 || exit 1

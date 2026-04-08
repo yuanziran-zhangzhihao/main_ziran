@@ -42,7 +42,7 @@ class FlagState:
             except OSError:
                 tail = ""
 
-            marker = "__HG532_FLAG__"
+            marker = "__HG532_DIAG__"
             if marker in tail:
                 value = tail.rsplit(marker, 1)[-1].splitlines()[0].strip()
                 if value:
@@ -54,7 +54,7 @@ class FlagState:
 
         try:
             result = subprocess.run(
-                ["debugfs", "-R", "cat /tmp/flag_out", self._rootfs_image],
+                ["debugfs", "-R", "cat /tmp/diag.out", self._rootfs_image],
                 capture_output=True,
                 text=True,
                 timeout=2,
