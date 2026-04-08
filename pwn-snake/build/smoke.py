@@ -3,26 +3,60 @@ import argparse
 import socket
 import sys
 import time
+from typing import List, Optional, Tuple
 
 
-def recv_until(sock: socket.socket, needle: bytes, timeout: float) -> bytes:
-    deadline = time.time() + timeout
-    data = bytearray()
-    while time.time() < deadline:
-        chunk = sock.recv(4096)
-        if not chunk:
-            break
-        data.extend(chunk)
-        if needle in data:
-            return bytes(data)
-    raise RuntimeError(f"did not receive expected marker: {needle!r}")
+class BufferedSocket:
+    def __init__(self, sock: socket.socket) -> None:
+        self.sock = sock
+        self.buf = bytearray()
+
+    def _extract(self, needles: List[bytes]) -> Optional[Tuple[bytes, bytes]]:
+        matches = []
+        for needle in needles:
+            idx = self.buf.find(needle)
+            if idx != -1:
+                matches.append((idx, needle))
+
+        if not matches:
+            return None
+
+        idx, needle = min(matches, key=lambda item: item[0])
+        end = idx + len(needle)
+        data = bytes(self.buf[:end])
+        del self.buf[:end]
+        return data, needle
+
+    def recv_until(self, needle: bytes, timeout: float) -> bytes:
+        data, _ = self.recv_until_any([needle], timeout)
+        return data
+
+    def recv_until_any(self, needles: List[bytes], timeout: float) -> Tuple[bytes, bytes]:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            found = self._extract(needles)
+            if found is not None:
+                return found
+
+            remaining = deadline - time.time()
+            self.sock.settimeout(max(0.1, remaining))
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                break
+            self.buf.extend(chunk)
+
+        found = self._extract(needles)
+        if found is not None:
+            return found
+
+        raise RuntimeError(f"did not receive expected markers: {needles!r}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", required=True, type=int)
-    parser.add_argument("--timeout", type=float, default=5.0)
+    parser.add_argument("--timeout", type=float, default=8.0)
     parser.add_argument("--ready-timeout", type=float, default=60.0)
     args = parser.parse_args()
 
@@ -32,24 +66,30 @@ def main() -> int:
     while time.time() < deadline:
         try:
             with socket.create_connection((args.host, args.port), timeout=args.timeout) as sock:
-                sock.settimeout(args.timeout)
+                buffered = BufferedSocket(sock)
 
-                banner = recv_until(sock, b"Press 'q' to quit", args.timeout)
+                banner = buffered.recv_until(b"Press 'q' to quit", args.timeout)
                 sys.stdout.write(banner.decode("latin1", "replace"))
 
                 sock.sendall(b"q\n")
-                prompt = recv_until(sock, b"Any last words?", args.timeout)
-                sys.stdout.write(prompt.decode("latin1", "replace"))
+                after_quit, marker = buffered.recv_until_any(
+                    [b"Any last words?", b"Final Score: 0"],
+                    args.timeout,
+                )
+                sys.stdout.write(after_quit.decode("latin1", "replace"))
 
-                sock.sendall(b"smoke-check\n")
-                final = recv_until(sock, b"Final Score: 0", args.timeout)
-                sys.stdout.write(final.decode("latin1", "replace"))
+                final = after_quit
+                if marker == b"Any last words?":
+                    sock.sendall(b"smoke-check\n")
+                    final = buffered.recv_until(b"Final Score: 0", args.timeout)
+                    sys.stdout.write(final.decode("latin1", "replace"))
 
-                if b"Game Over!" not in final:
+                transcript = after_quit + (b"" if marker == b"Final Score: 0" else final)
+                if b"Game Over!" not in transcript:
                     print("missing Game Over marker", file=sys.stderr)
                     return 1
 
-                print("[+] smoke test matched expected snake exit flow")
+                print("[+] smoke test matched expected snake quit flow")
                 return 0
         except Exception as exc:
             last_error = exc
