@@ -19,6 +19,16 @@ ATTACHMENTS_DIR="../attachments"  # 从 build/ 到 pwn-bypass/attachments
 # ==============================================
 # 执行逻辑：提取容器内文件到附件目录
 # ==============================================
+CONTAINER_ID=""
+
+cleanup() {
+    if [ -n "$CONTAINER_ID" ]; then
+        docker rm -v "$CONTAINER_ID" &> /dev/null || true
+    fi
+}
+
+trap cleanup EXIT
+
 echo "===== Starting post-build attachment extraction ====="
 echo "Target image: $IMAGE_TAG"
 echo "Working directory: $(pwd)"
@@ -66,7 +76,8 @@ copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
 copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
 
 # 5. 清理临时容器
-docker rm -v "$CONTAINER_ID" &> /dev/null
+cleanup
+trap - EXIT
 echo "Temporary container removed: $CONTAINER_ID"
 
 echo "===== Attachment extraction completed ====="

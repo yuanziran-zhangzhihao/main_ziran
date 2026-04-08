@@ -2,13 +2,15 @@ name: pwn-bypass
 
 on:
   push:
-    branches:
-      - pwn-bypass
+    branches: [pwn-bypass]
+    paths:
+      - "pwn-bypass/**"
+      - ".github/workflows/pwn-bypass.yml"
   workflow_dispatch:
 
 env:
   NAME: pwn-bypass
-  IMAGE: ghcr.io/${{ github.repository_owner }}/pwn-bypass:latest
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   challenge-build:
@@ -16,20 +18,19 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-          submodules: true
+        uses: actions/checkout@v5
 
       - name: Check required files
         run: |
-          test -f pwn-bypass/build/Dockerfile
-          test -f pwn-bypass/build/post-build.sh
-          test -f pwn-bypass/build/src/pwn
-          test -f pwn-bypass/build/src/start.sh
+          test -f ${{ env.NAME }}/build/Dockerfile
+          test -f ${{ env.NAME }}/build/post-build.sh
+          test -f ${{ env.NAME }}/build/smoke.py
+          test -f ${{ env.NAME }}/build/src/bypass.c
+          test -f ${{ env.NAME }}/build/src/start.sh
 
       - name: Login to ghcr.io
         uses: docker/login-action@v3
@@ -39,37 +40,76 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
-          context: ./pwn-bypass/build
+          context: ${{ env.NAME }}/build
           push: true
-          tags: ${{ env.IMAGE }}
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+            ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
 
-      - name: Pull image for post-build
-        run: docker pull ${{ env.IMAGE }}
+      - name: Pull image for validation
+        run: docker pull ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
 
       - name: Run post-build script
-        working-directory: pwn-bypass/build
+        working-directory: ${{ env.NAME }}/build
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           NAME: ${{ env.NAME }}
-          IMAGE_TAG: ${{ env.IMAGE }}
+          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
         run: |
           chmod +x post-build.sh
           ./post-build.sh
 
       - name: Verify attachments
         run: |
-          test -f pwn-bypass/attachments/pwn
-          test -f pwn-bypass/attachments/libc.so.6
-          test -f pwn-bypass/attachments/ld-linux-x86-64.so.2
-          ls -lh pwn-bypass/attachments
+          test -f ${{ env.NAME }}/attachments/pwn
+          test -f ${{ env.NAME }}/attachments/libc.so.6
+          test -f ${{ env.NAME }}/attachments/ld-linux-x86-64.so.2
+          ls -lh ${{ env.NAME }}/attachments
+
+      - name: Start smoke container
+        run: |
+          docker run -d --name pwn-bypass-smoke \
+            -p 8000:8000 \
+            -e 'FLAG=FLAG{ci_smoke_test}' \
+            ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
+
+      - name: Run exploit smoke test
+        run: |
+          python3 ${{ env.NAME }}/build/smoke.py \
+            --host 127.0.0.1 \
+            --port 8000 \
+            --ready-timeout 60 \
+            --expected-flag 'FLAG{ci_smoke_test}'
+
+      - name: Capture smoke diagnostics
+        if: failure()
+        run: |
+          docker ps -a > docker-ps.log 2>&1 || true
+          docker logs pwn-bypass-smoke > pwn-bypass-smoke.log 2>&1 || true
+          docker top pwn-bypass-smoke -eo pid,ppid,cmd > pwn-bypass-smoke.top 2>&1 || true
 
       - name: Upload attachments
         uses: actions/upload-artifact@v4
         with:
-          name: pwn-bypass-attachments
-          path: pwn-bypass/attachments/
+          name: ${{ env.NAME }}-attachments
+          path: ${{ env.NAME }}/attachments/
+
+      - name: Upload smoke logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}-smoke-logs
+          path: |
+            docker-ps.log
+            pwn-bypass-smoke.log
+            pwn-bypass-smoke.top
+
+      - name: Cleanup smoke container
+        if: always()
+        run: |
+          docker rm -f pwn-bypass-smoke >/dev/null 2>&1 || true
 
   prune-old-images:
     runs-on: ubuntu-latest
@@ -79,12 +119,19 @@ jobs:
       packages: write
 
     steps:
+      - name: Get package name (lowercase)
+        id: pkg
+        run: |
+          pkg_name=$(echo '${{ env.NAME }}' | tr '[:upper:]' '[:lower:]')
+          echo "pkg_name=$pkg_name" >> "$GITHUB_OUTPUT"
+          echo "Using package name: $pkg_name"
+
       - name: Clean old images
         uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: ${{ github.repository_owner }}
-          package: pwn-bypass
+          package: ${{ steps.pkg.outputs.pkg_name }}
           exclude-tags: latest
           dry-run: true
           delete-untagged: true
