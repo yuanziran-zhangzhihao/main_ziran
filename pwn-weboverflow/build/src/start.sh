@@ -30,7 +30,13 @@ if [ ! -x "$CHROOT_BIN" ]; then
   CHROOT_BIN="/usr/bin/chroot"
 fi
 
-CHROOT_USER="${CHROOT_USER:-ctf:ctf}"
+if [ "${CHROOT_USER:-}" ]; then
+  CHROOT_USER="$CHROOT_USER"
+elif id -u ctf >/dev/null 2>&1; then
+  CHROOT_USER="$(id -u ctf):$(id -g ctf)"
+else
+  CHROOT_USER="ctf:ctf"
+fi
 if "$CHROOT_BIN" --help 2>&1 | grep -q -- '--userspec'; then
   CHROOT_PREFIX="$CHROOT_BIN --userspec=$CHROOT_USER /home/ctf"
 else
