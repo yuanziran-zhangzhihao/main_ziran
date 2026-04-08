@@ -68,23 +68,20 @@ def main() -> int:
             with socket.create_connection((args.host, args.port), timeout=args.timeout) as sock:
                 buffered = BufferedSocket(sock)
 
-                banner = buffered.recv_until(b"Press 'q' to quit", args.timeout)
-                sys.stdout.write(banner.decode("latin1", "replace"))
-
                 sock.sendall(b"q\n")
-                after_quit, marker = buffered.recv_until_any(
+                after_input, marker = buffered.recv_until_any(
                     [b"Any last words?", b"Final Score: 0"],
                     args.timeout,
                 )
-                sys.stdout.write(after_quit.decode("latin1", "replace"))
+                sys.stdout.write(after_input.decode("latin1", "replace"))
 
-                final = after_quit
+                final = after_input
                 if marker == b"Any last words?":
                     sock.sendall(b"smoke-check\n")
                     final = buffered.recv_until(b"Final Score: 0", args.timeout)
                     sys.stdout.write(final.decode("latin1", "replace"))
 
-                transcript = after_quit + (b"" if marker == b"Final Score: 0" else final)
+                transcript = after_input + (b"" if marker == b"Final Score: 0" else final)
                 if b"Game Over!" not in transcript:
                     print("missing Game Over marker", file=sys.stderr)
                     return 1
