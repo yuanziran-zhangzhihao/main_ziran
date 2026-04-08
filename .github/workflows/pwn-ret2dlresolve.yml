@@ -73,18 +73,7 @@ jobs:
             -e 'FLAG_VALUE=flag{smoke_ret2dlresolve}' \
             ${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}
           for i in $(seq 1 30); do
-            if python3 - <<'PY'
-import socket
-s = socket.socket()
-s.settimeout(1)
-try:
-    s.connect(("127.0.0.1", 18000))
-    print("ready")
-except OSError:
-    raise SystemExit(1)
-finally:
-    s.close()
-PY
+            if python3 -c "import socket; s = socket.socket(); s.settimeout(1); s.connect(('127.0.0.1', 18000)); s.close()"
             then
               break
             fi
