@@ -18,7 +18,8 @@ RUN groupadd -r ctf && useradd -r -g ctf ctf && \
     chown -R ctf:ctf /home/ctf
 
 COPY src/start.sh /start.sh
-RUN chmod +x /start.sh
+COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
+RUN chmod +x /start.sh /usr/local/bin/challenge-entry
 
 WORKDIR /home/ctf
 
