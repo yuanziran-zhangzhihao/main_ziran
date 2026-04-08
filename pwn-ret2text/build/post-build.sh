@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # ==============================================
 # 配置区：根据实际环境调整（通常无需修改）
@@ -39,12 +40,17 @@ if [ -z "$CONTAINER_ID" ]; then
 fi
 echo "Temporary container created: $CONTAINER_ID"
 
+cleanup() {
+    docker rm -v "$CONTAINER_ID" &> /dev/null || true
+}
+trap cleanup EXIT
+
 # 3. 创建附件目录（若不存在）
 mkdir -p "$ATTACHMENTS_DIR"
 echo "Attachments directory ready: $(cd "$ATTACHMENTS_DIR" && pwd)"
 
 # 4. 复制文件（带错误检查）
-copy_file() {
+copy_required_file() {
     local src="$1"
     local dest_dir="$2"
     local filename=$(basename "$src")
@@ -52,22 +58,19 @@ copy_file() {
     if docker cp "$CONTAINER_ID:$src" "$dest_dir/" &> /dev/null; then
         echo "✅ Copied: $filename"
     else
-        echo "⚠️ Warning: Failed to copy $filename (file may not exist in container)"
+        echo "❌ Error: Failed to copy required file $filename"
+        exit 1
     fi
 }
 
 # 复制 pwn 文件
-copy_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR"
+copy_required_file "$CONTAINER_PWN_PATH" "$ATTACHMENTS_DIR"
 
 # 复制 libc 库
-copy_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
+copy_required_file "$CONTAINER_LIBC_PATH" "$ATTACHMENTS_DIR"
 
 # 复制 ld-linux 加载器
-copy_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
-
-# 5. 清理临时容器
-docker rm -v "$CONTAINER_ID" &> /dev/null
-echo "Temporary container removed: $CONTAINER_ID"
+copy_required_file "$CONTAINER_LD_PATH" "$ATTACHMENTS_DIR"
 
 echo "===== Attachment extraction completed ====="
 echo "Files saved to: $(cd "$ATTACHMENTS_DIR" && pwd)"

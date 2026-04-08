@@ -1,27 +1,28 @@
 #!/bin/sh
+set -eu
 
-if [ "$A1CTF_FLAG" ]; then
-    INSERT_FLAG="$A1CTF_FLAG"
-    unset A1CTF_FLAG
-elif [ "$PCTF_FLAG" ]; then
-    INSERT_FLAG="$PCTF_FLAG"
-    unset PCTF_FLAG
-elif [ "$GZCTF_FLAG" ]; then
-    INSERT_FLAG="$GZCTF_FLAG"
-    unset GZCTF_FLAG
-elif [ "$FLAG" ]; then
-    INSERT_FLAG="$FLAG"
-    unset FLAG
-else
-    INSERT_FLAG="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
-fi
+PORT="${PORT:-8000}"
 
-echo -n $INSERT_FLAG > /home/ctf/flag
-INSERT_FLAG=""
-chown ctf:ctf /home/ctf/flag
+pick_flag() {
+    for name in FLAG_VALUE A1CTF_FLAG PCTF_FLAG GZCTF_FLAG FLAG; do
+        eval "value=\${$name:-}"
+        if [ -n "$value" ]; then
+            printf '%s' "$value"
+            return 0
+        fi
+    done
 
-cp /bin/sh /home/ctf/sh && chmod +x /home/ctf/sh
+    rand="$(tr -dc 'a-z0-9' </dev/urandom | head -c 24 || true)"
+    printf 'FLAG{%s}' "${rand:-pwn_ret2text_local}"
+}
 
-socat -T60 TCP-LISTEN:8000,reuseaddr,fork EXEC:"/usr/sbin/chroot /home/ctf ./pwn",stderr
+INSERT_FLAG="$(pick_flag)"
+unset FLAG_VALUE A1CTF_FLAG PCTF_FLAG GZCTF_FLAG FLAG
 
+printf '%s' "$INSERT_FLAG" > /home/ctf/flag
+chown 1000:1000 /home/ctf/flag
+chmod 0400 /home/ctf/flag
 
+echo "[*] pwn-ret2text listening on 0.0.0.0:${PORT}"
+
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:'/usr/local/bin/challenge-entry',stderr
