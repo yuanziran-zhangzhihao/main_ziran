@@ -64,11 +64,11 @@ jobs:
             -e 'FLAG=FLAG{ci_smoke_test}' \
             ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
 
-      - name: Wait for TCP service
+      - name: Wait for container listener log
         run: |
           ready=0
           for _ in $(seq 1 60); do
-            if python3 -c "import socket; s=socket.socket(); s.settimeout(1.0); s.connect(('127.0.0.1', 1337)); s.close()"
+            if docker logs core_level0-smoke 2>&1 | grep -q 'core_level0 docker service listening on 1337'
             then
               ready=1
               break
@@ -83,7 +83,16 @@ jobs:
             --host 127.0.0.1 \
             --port 1337 \
             --payload smoke/exp.static \
+            --boot-timeout 180 \
+            --flag-timeout 180 \
             --expect 'FLAG{ci_smoke_test}'
+
+      - name: Capture smoke diagnostics
+        if: failure()
+        run: |
+          docker ps -a > docker-ps.log 2>&1 || true
+          docker logs core_level0-smoke > core_level0-smoke.log 2>&1 || true
+          docker top core_level0-smoke -eo pid,ppid,cmd > core_level0-smoke.top 2>&1 || true
 
       - name: Upload attachments
         uses: actions/upload-artifact@v4
@@ -99,6 +108,9 @@ jobs:
           path: |
             attachments/
             smoke/
+            docker-ps.log
+            core_level0-smoke.log
+            core_level0-smoke.top
 
       - name: Cleanup smoke container
         if: always()
