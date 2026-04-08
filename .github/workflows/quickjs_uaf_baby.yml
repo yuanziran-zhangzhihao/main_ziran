@@ -52,22 +52,56 @@ jobs:
         run: docker pull ${{ env.IMAGE }}
 
       - name: Generate challenge artifacts
-        run: docker run --rm -v "$PWD:/work" ${{ env.IMAGE }}
+        run: docker run --rm -v "$PWD:/out" --entrypoint /usr/local/bin/export-dist ${{ env.IMAGE }} /out
 
       - name: Check generated files
         run: |
           test -f dist/qjs
-          test -f dist/solve.js
           test -f dist/README.md
           test -f dist/quickjs-uaf-baby.tar.gz
           file dist/qjs
           ls -lh dist
 
+      - name: Start smoke container
+        run: |
+          docker rm -f quickjs-uaf-baby-smoke >/dev/null 2>&1 || true
+          docker run -d --name quickjs-uaf-baby-smoke -p 9999:9999 -e 'FLAG_VALUE=FLAG{ci_smoke_test}' ${{ env.IMAGE }}
+
+      - name: Wait for tcp service
+        run: |
+          ready=0
+          for _ in $(seq 1 60); do
+            if nc -z 127.0.0.1 9999; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1
+
+      - name: Run smoke exploit
+        run: |
+          out="$(timeout 15 bash -lc 'cat solve.js | nc 127.0.0.1 9999')"
+          printf '%s\n' "$out" | tee smoke.log
+          printf '%s\n' "$out" | grep -q 'FLAG{ci_smoke_test}'
+
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: quickjs-uaf-baby-artifacts
           path: dist/
+
+      - name: Upload smoke log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickjs-uaf-baby-smoke
+          path: smoke.log
+
+      - name: Cleanup smoke container
+        if: always()
+        run: docker rm -f quickjs-uaf-baby-smoke >/dev/null 2>&1 || true
 
   prune-old-images:
     runs-on: ubuntu-latest

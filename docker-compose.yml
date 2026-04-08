@@ -1,7 +1,9 @@
 name: quickjs-uaf-baby
 
 services:
-  builder:
+  challenge:
     build: .
-    volumes:
-      - .:/work
+    ports:
+      - "9999:9999"
+    environment:
+      FLAG_VALUE: FLAG{local_docker_test}
