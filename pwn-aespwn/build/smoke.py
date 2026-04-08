@@ -12,20 +12,24 @@ def recv_until(sock: socket.socket, needle: bytes, timeout: float) -> bytes:
     deadline = time.time() + timeout
     data = bytearray()
     while time.time() < deadline:
-        chunk = sock.recv(4096)
+        try:
+            chunk = sock.recv(4096)
+        except socket.timeout:
+            continue
         if not chunk:
             break
         data.extend(chunk)
         if needle in data:
             return bytes(data)
-    raise RuntimeError(f"did not receive expected marker: {needle!r}")
+    tail = bytes(data)[-400:]
+    raise RuntimeError(f"did not receive expected marker: {needle!r}; received tail={tail!r}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", required=True)
     parser.add_argument("--port", required=True, type=int)
-    parser.add_argument("--timeout", type=float, default=5.0)
+    parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument("--ready-timeout", type=float, default=60.0)
     parser.add_argument("--expect", default="FLAG{ci_smoke_test}")
     args = parser.parse_args()
@@ -39,14 +43,18 @@ def main() -> int:
                 sock.settimeout(args.timeout)
 
                 sock.sendall(EXPECTED_CT + b"\n")
-                time.sleep(0.2)
-                sock.sendall(b"cat /flag\nexit\n")
+                time.sleep(0.5)
+                sock.sendall(b"/bin/cat /flag || /bin/cat flag\n")
+                sock.shutdown(socket.SHUT_WR)
                 data = recv_until(sock, args.expect.encode(), args.timeout)
                 text = data.decode("latin1", "replace")
                 sys.stdout.write(text)
 
                 if "FAIL: not match." in text:
                     print("ciphertext was rejected", file=sys.stderr)
+                    return 1
+                if "No such file" in text:
+                    print("flag path was not readable inside the exploit shell", file=sys.stderr)
                     return 1
 
                 print("[+] smoke test matched expected exploit-to-shell flow")
