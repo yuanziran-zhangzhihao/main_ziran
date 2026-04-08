@@ -1,25 +1,32 @@
 #!/bin/sh
+set -eu
 
-if [ "$A1CTF_FLAG" ]; then
+PORT="${PORT:-8000}"
+
+if [ -n "${A1CTF_FLAG:-}" ]; then
     INSERT_FLAG="$A1CTF_FLAG"
     unset A1CTF_FLAG
-elif [ "$PCTF_FLAG" ]; then
+elif [ -n "${PCTF_FLAG:-}" ]; then
     INSERT_FLAG="$PCTF_FLAG"
     unset PCTF_FLAG
-elif [ "$GZCTF_FLAG" ]; then
+elif [ -n "${GZCTF_FLAG:-}" ]; then
     INSERT_FLAG="$GZCTF_FLAG"
     unset GZCTF_FLAG
-elif [ "$FLAG" ]; then
+elif [ -n "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
     INSERT_FLAG="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
 fi
 
-echo -n $INSERT_FLAG > /home/ctf/flag
-INSERT_FLAG=""
+printf '%s' "$INSERT_FLAG" > /home/ctf/flag
+unset INSERT_FLAG
 chown ctf:ctf /home/ctf/flag
+chmod 0400 /home/ctf/flag
 
-cp /bin/sh /home/ctf/sh && chmod +x /home/ctf/sh
+echo "[*] pwn-aespwn service listening on ${PORT}"
 
-socat -T60 TCP-LISTEN:8000,reuseaddr,fork EXEC:"/usr/sbin/chroot /home/ctf ./pwn",stderr
+# Keep the challenge on plain stdin/stdout pipes so the post-success shell reads
+# scripted commands normally. The smoke test sends the ciphertext immediately
+# and does not rely on the unflushed prompt being visible first.
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",stderr
