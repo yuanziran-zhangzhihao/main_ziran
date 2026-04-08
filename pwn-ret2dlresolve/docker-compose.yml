@@ -1,0 +1,11 @@
+name: pwn-ret2dlresolve
+
+services:
+  challenge:
+    build:
+      context: ./build
+    environment:
+      FLAG_VALUE: ${FLAG_VALUE:-flag_demo_ret2dlresolve}
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
