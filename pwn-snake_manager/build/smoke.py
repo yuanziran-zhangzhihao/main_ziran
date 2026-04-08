@@ -5,17 +5,36 @@ import sys
 import time
 
 
-def recv_until(sock: socket.socket, needle: bytes, timeout: float) -> bytes:
-    deadline = time.time() + timeout
-    data = bytearray()
-    while time.time() < deadline:
-        chunk = sock.recv(4096)
-        if not chunk:
-            break
-        data.extend(chunk)
-        if needle in data:
-            return bytes(data)
-    raise RuntimeError(f"did not receive expected marker: {needle!r}")
+class BufferedSocket:
+    def __init__(self, sock: socket.socket) -> None:
+        self.sock = sock
+        self.buf = bytearray()
+
+    def recv_until(self, needle: bytes, timeout: float) -> bytes:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            idx = self.buf.find(needle)
+            if idx != -1:
+                end = idx + len(needle)
+                data = bytes(self.buf[:end])
+                del self.buf[:end]
+                return data
+
+            remaining = deadline - time.time()
+            self.sock.settimeout(max(0.1, remaining))
+            chunk = self.sock.recv(4096)
+            if not chunk:
+                break
+            self.buf.extend(chunk)
+
+        idx = self.buf.find(needle)
+        if idx != -1:
+            end = idx + len(needle)
+            data = bytes(self.buf[:end])
+            del self.buf[:end]
+            return data
+
+        raise RuntimeError(f"did not receive expected marker: {needle!r}")
 
 
 def main() -> int:
@@ -32,31 +51,31 @@ def main() -> int:
     while time.time() < deadline:
         try:
             with socket.create_connection((args.host, args.port), timeout=args.timeout) as sock:
-                sock.settimeout(args.timeout)
+                buffered = BufferedSocket(sock)
 
-                menu = recv_until(sock, b"2.login admin", args.timeout)
+                menu = buffered.recv_until(b"2.login admin", args.timeout)
                 sys.stdout.write(menu.decode("latin1", "replace"))
 
                 sock.sendall(b"1\n")
-                game = recv_until(sock, b"Press 'q' to quit", args.timeout)
+                game = buffered.recv_until(b"Press 'q' to quit", args.timeout)
                 sys.stdout.write(game.decode("latin1", "replace"))
 
                 sock.sendall(b"q")
-                end = recv_until(sock, b"Final Score: 0", args.timeout)
+                end = buffered.recv_until(b"Final Score: 0", args.timeout)
                 sys.stdout.write(end.decode("latin1", "replace"))
                 if b"Game Over!" not in end:
                     print("missing Game Over marker", file=sys.stderr)
                     return 1
 
-                menu2 = recv_until(sock, b"2.login admin", args.timeout)
+                menu2 = buffered.recv_until(b"2.login admin", args.timeout)
                 sys.stdout.write(menu2.decode("latin1", "replace"))
 
                 sock.sendall(b"2\n")
-                login = recv_until(sock, b"Enter admin name:", args.timeout)
+                login = buffered.recv_until(b"Enter admin name:", args.timeout)
                 sys.stdout.write(login.decode("latin1", "replace"))
 
                 sock.sendall(b"guest\n")
-                denied = recv_until(sock, b"No such user.", args.timeout)
+                denied = buffered.recv_until(b"No such user.", args.timeout)
                 sys.stdout.write(denied.decode("latin1", "replace"))
 
                 print("[+] smoke test matched expected menu, TUI, and admin-login flow")
