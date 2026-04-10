@@ -1,3 +1,24 @@
+FROM debian:bookworm-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libc6-dev \
+    libncurses-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+COPY src/snake_server.c /build/snake_server.c
+
+RUN gcc snake_server.c -o pwn \
+    -fno-stack-protector \
+    -no-pie \
+    -z execstack \
+    -fcf-protection=full \
+    -lncursesw \
+    -ltinfo
+
 FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -23,7 +44,7 @@ RUN chmod +x /start.sh /usr/local/bin/challenge-entry
 
 WORKDIR /home/ctf
 
-COPY src/pwn /home/ctf/pwn
+COPY --from=build /build/pwn /home/ctf/pwn
 RUN chmod +x /home/ctf/pwn
 
 RUN set -eux; \

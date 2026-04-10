@@ -27,7 +27,8 @@ jobs:
         run: |
           test -f pwn-snake_manager/build/Dockerfile
           test -f pwn-snake_manager/build/post-build.sh
-          test -f pwn-snake_manager/build/src/pwn
+          test -f pwn-snake_manager/build/src/snake_server.c
+          test -f pwn-snake_manager/build/src/challenge-entry.sh
           test -f pwn-snake_manager/build/src/start.sh
           test -f pwn-snake_manager/build/smoke.py
 
