@@ -23,7 +23,7 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
-    libncurses6 \
+    libncursesw6 \
     libtinfo6 \
     ncurses-base \
     ncurses-term \
@@ -67,11 +67,11 @@ RUN set -eux; \
     if [ -f /usr/lib/x86_64-linux-gnu/libdl.so.2 ]; then \
         cp -v --parents /usr/lib/x86_64-linux-gnu/libdl.so.2 /home/ctf/; \
     fi; \
-    if [ -f /lib/x86_64-linux-gnu/libncurses.so.6 ]; then \
-        cp -v --parents /lib/x86_64-linux-gnu/libncurses.so.6 /home/ctf/; \
+    if [ -f /lib/x86_64-linux-gnu/libncursesw.so.6 ]; then \
+        cp -v --parents /lib/x86_64-linux-gnu/libncursesw.so.6 /home/ctf/; \
     fi; \
-    if [ -f /usr/lib/x86_64-linux-gnu/libncurses.so.6 ]; then \
-        cp -v --parents /usr/lib/x86_64-linux-gnu/libncurses.so.6 /home/ctf/; \
+    if [ -f /usr/lib/x86_64-linux-gnu/libncursesw.so.6 ]; then \
+        cp -v --parents /usr/lib/x86_64-linux-gnu/libncursesw.so.6 /home/ctf/; \
     fi; \
     if [ -f /lib/x86_64-linux-gnu/libtinfo.so.6 ]; then \
         cp -v --parents /lib/x86_64-linux-gnu/libtinfo.so.6 /home/ctf/; \
@@ -96,6 +96,16 @@ RUN mkdir -p /home/ctf/bin && \
     cp /bin/cat /home/ctf/bin/ && \
     cp /bin/ls /home/ctf/bin/ && \
     chmod +x /home/ctf/bin/*
+
+RUN set -eux; \
+    for helper in /bin/sh /bin/cat /bin/ls; do \
+        ldd "$helper" | awk '{ \
+            if ($1 ~ /^\//) print $1; \
+            if ($3 ~ /^\//) print $3; \
+        }' | sort -u | while read -r so; do \
+            cp -v --parents "$so" /home/ctf/; \
+        done; \
+    done
 
 RUN set -eux; \
     mkdir -p /home/ctf/dev; \

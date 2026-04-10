@@ -67,9 +67,9 @@ copy_from_candidates "libc.so.6" \
     "/home/ctf/lib/x86_64-linux-gnu/libc.so.6" \
     "/home/ctf/usr/lib/x86_64-linux-gnu/libc.so.6"
 
-copy_from_candidates "libncurses.so.6" \
-    "/home/ctf/lib/x86_64-linux-gnu/libncurses.so.6" \
-    "/home/ctf/usr/lib/x86_64-linux-gnu/libncurses.so.6"
+copy_from_candidates "libncursesw.so.6" \
+    "/home/ctf/lib/x86_64-linux-gnu/libncursesw.so.6" \
+    "/home/ctf/usr/lib/x86_64-linux-gnu/libncursesw.so.6"
 
 copy_from_candidates "libtinfo.so.6" \
     "/home/ctf/lib/x86_64-linux-gnu/libtinfo.so.6" \

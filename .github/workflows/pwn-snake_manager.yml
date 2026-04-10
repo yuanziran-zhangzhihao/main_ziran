@@ -96,7 +96,7 @@ jobs:
           test -f pwn-snake_manager/attachments/pwn
           test -f pwn-snake_manager/attachments/libc.so.6
           test -f pwn-snake_manager/attachments/ld-linux-x86-64.so.2
-          test -f pwn-snake_manager/attachments/libncurses.so.6
+          test -f pwn-snake_manager/attachments/libncursesw.so.6
           test -f pwn-snake_manager/attachments/libtinfo.so.6
           test -f pwn-snake_manager/attachments/libdl.so.2
           ls -lh pwn-snake_manager/attachments
