@@ -21,8 +21,11 @@ printf '%s' "$FLAG_VALUE" > /home/ctf/flag
 chown ctf:ctf /home/ctf/flag
 chmod 0400 /home/ctf/flag
 
+CTF_UID="$(id -u ctf)"
+CTF_GID="$(id -g ctf)"
+
 # The challenge binary already opens its own listening socket on port 6666.
-/usr/sbin/chroot --userspec=ctf:ctf /home/ctf /pwn &
+/usr/sbin/chroot --userspec="${CTF_UID}:${CTF_GID}" /home/ctf /pwn &
 PWN_PID="$!"
 
 cleanup() {
