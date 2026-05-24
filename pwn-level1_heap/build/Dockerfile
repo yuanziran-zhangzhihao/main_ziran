@@ -1,8 +1,14 @@
-FROM ubuntu:16.04
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:ubuntu-20.04
+FROM ${BASE_IMAGE}
 
-# Keep only the repositories needed for runtime packages and avoid flaky backports.
-RUN sed -i '/xenial-backports/d' /etc/apt/sources.list && \
-    apt-get update && \
+# Keep only the repositories needed for runtime packages and use a stable mirror.
+RUN sed -i \
+        -e 's|http://archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+        -e 's|http://security.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+        -e '/^[[:space:]]*deb .* focal-backports /d' \
+        -e '/^[[:space:]]*deb .* multiverse/d' \
+        /etc/apt/sources.list && \
+    apt-get update -o Acquire::Retries=5 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         socat \
         ca-certificates && \
@@ -20,7 +26,8 @@ COPY src/start.sh /start.sh
 # - interpreter: ./ld-linux-x86-64.so.2
 # - NEEDED:      ./libc.so.6
 # so both files must exist at the root of the chroot.
-RUN chmod 0755 /home/ctf/pwn /start.sh && \
+RUN sed -i 's/\r$//' /start.sh && \
+    chmod 0755 /home/ctf/pwn /start.sh && \
     mkdir -p /home/ctf/bin /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64 && \
     cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/libc.so.6 && \
     cp /lib64/ld-linux-x86-64.so.2 /home/ctf/ld-linux-x86-64.so.2 && \
