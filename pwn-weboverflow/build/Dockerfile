@@ -1,5 +1,12 @@
-ARG BASE_IMAGE=debian:bookworm-slim
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
 FROM ${BASE_IMAGE}
+
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        > /etc/apt/sources.list
 
 RUN set -eux; \
     missing_packages=""; \
@@ -28,7 +35,7 @@ RUN set -eux; \
     chown ctf:ctf /home/ctf
 
 COPY src/start.sh /start.sh
-RUN chmod 0755 /start.sh
+RUN sed -i 's/\r$//' /start.sh && chmod 0755 /start.sh
 
 WORKDIR /home/ctf
 
