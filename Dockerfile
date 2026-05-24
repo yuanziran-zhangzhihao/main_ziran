@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=ubuntu:20.04
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:ubuntu-20.04
 FROM ${BASE_IMAGE}
 
 ARG KERNEL_URL=https://people.debian.org/~aurel32/qemu/mips/vmlinux-2.6.32-5-4kc-malta
@@ -9,6 +9,13 @@ ENV DEBIAN_FRONTEND=noninteractive
 LABEL org.opencontainers.image.source="$REPOSITORY_URL" \
       org.opencontainers.image.description="HG532 CVE-2017-17215 CTF challenge"
 WORKDIR /opt/hg532-ctf
+
+RUN set -eux; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-updates main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ focal-security main restricted universe' \
+        > /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -38,7 +45,16 @@ COPY docker-entrypoint.sh ./
 COPY ctf ./ctf
 COPY _HG532eV100R001C01B020_upgrade_packet.bin.extracted ./_HG532eV100R001C01B020_upgrade_packet.bin.extracted
 
-RUN chmod +x \
+RUN sed -i 's/\r$//' \
+    build_router_rootfs_image.sh \
+    boot_router.sh \
+    init_router_console.sh \
+    start.sh \
+    docker-entrypoint.sh \
+    ctf/install_guest_assets.sh \
+    ctf/guest/check_cache.sh \
+    ctf/guest/diag_sync.sh \
+    && chmod +x \
     build_router_rootfs_image.sh \
     boot_router.sh \
     init_router_console.sh \

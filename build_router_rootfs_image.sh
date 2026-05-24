@@ -25,6 +25,69 @@ restore_exec_bits() {
     fi
 }
 
+normalize_rootfs_line_endings() {
+    local path=""
+    local candidates=(
+        "$ROOTFS_DIR/etc/profile"
+        "$ROOTFS_DIR/etc/diag.profile"
+        "$ROOTFS_DIR/etc/inittab"
+    )
+
+    if [[ -d "$ROOTFS_DIR/etc/init.d" ]]; then
+        while IFS= read -r -d '' path; do
+            candidates+=("$path")
+        done < <(find "$ROOTFS_DIR/etc/init.d" -type f -print0)
+    fi
+
+    for path in "${candidates[@]}"; do
+        if [[ -f "$path" ]]; then
+            sed -i 's/\r$//' "$path"
+        fi
+    done
+}
+
+restore_flattened_symlinks() {
+    local path=""
+    local target=""
+    local resolved=""
+    local candidates=()
+    local rel
+
+    # Windows checkouts often materialize extracted firmware symlinks as
+    # tiny text files whose contents are the original link target.
+    if [[ -f "$ROOTFS_DIR/init" ]]; then
+        candidates+=("$ROOTFS_DIR/init")
+    fi
+
+    for rel in bin sbin lib usr/bin usr/sbin usr/lib; do
+        if [[ -e "$ROOTFS_DIR/$rel" ]]; then
+            candidates+=("$ROOTFS_DIR/$rel")
+        fi
+    done
+
+    if (( ${#candidates[@]} == 0 )); then
+        return 0
+    fi
+
+    while IFS= read -r -d '' path; do
+        target="$(tr -d '\r\n' < "$path")"
+
+        [[ -n "$target" ]] || continue
+        [[ "$target" =~ ^[A-Za-z0-9._/+:-]+$ ]] || continue
+
+        if [[ "$target" == /* ]]; then
+            resolved="$ROOTFS_DIR/$target"
+        else
+            resolved="$(dirname "$path")/$target"
+        fi
+
+        if [[ -e "$resolved" ]]; then
+            rm -f "$path"
+            ln -s "$target" "$path"
+        fi
+    done < <(find "${candidates[@]}" -type f -size -128c -print0)
+}
+
 if [[ ! -d "$ROOTFS_DIR" ]]; then
     echo "[-] router rootfs directory not found: $ROOTFS_DIR" >&2
     exit 1
@@ -35,7 +98,9 @@ if ! command -v mkfs.ext2 >/dev/null 2>&1; then
     exit 1
 fi
 
+normalize_rootfs_line_endings
 restore_exec_bits
+restore_flattened_symlinks
 
 used_kb="$(du -sk "$ROOTFS_DIR" | awk '{print $1}')"
 size_kb="$((used_kb + EXTRA_MB * 1024))"

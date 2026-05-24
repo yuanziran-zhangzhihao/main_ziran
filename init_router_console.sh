@@ -187,6 +187,7 @@ run_cmd "ROOTFS_DEVICE=\"$ROOTFS_DEVICE\"; if [ -z \"\$ROOTFS_DEVICE\" ]; then f
 run_cmd "ROOTFS_DEVICE=\"$ROOTFS_DEVICE\"; if [ -z \"\$ROOTFS_DEVICE\" ]; then for candidate in /dev/sdb /dev/hdb /dev/vdb; do if [ -b \"\$candidate\" ]; then ROOTFS_DEVICE=\"\$candidate\"; break; fi; done; fi; grep -q ' $MOUNT_POINT ' /proc/mounts || mount -t ext2 \"\$ROOTFS_DEVICE\" $MOUNT_POINT"
 run_cmd "mkdir -p $MOUNT_POINT/proc $MOUNT_POINT/dev $MOUNT_POINT/sys"
 run_cmd "mkdir -p $MOUNT_POINT/tmp && chmod 1777 $MOUNT_POINT/tmp"
+run_cmd "mkdir -p $MOUNT_POINT/var/dhcp/dhcps $MOUNT_POINT/var/Wireless"
 run_cmd "grep -q ' $MOUNT_POINT/proc ' /proc/mounts || mount -t proc proc $MOUNT_POINT/proc"
 run_cmd "grep -q ' $MOUNT_POINT/dev ' /proc/mounts || mount -o bind /dev $MOUNT_POINT/dev"
 run_cmd "grep -q ' $MOUNT_POINT/sys ' /proc/mounts || mount -o bind /sys $MOUNT_POINT/sys || true"
