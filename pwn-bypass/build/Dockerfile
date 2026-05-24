@@ -1,4 +1,12 @@
-FROM debian:bookworm-slim AS builder
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
+FROM ${BASE_IMAGE} AS builder
+
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        > /etc/apt/sources.list
 
 RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
     gcc \
@@ -11,7 +19,14 @@ COPY src/bypass.c /src/bypass.c
 RUN gcc -O0 -fno-stack-protector -no-pie -z norelro -fcf-protection=full -Wl,-z,ibt,-z,shstk \
     -o /src/pwn /src/bypass.c
 
-FROM debian:bookworm-slim
+FROM ${BASE_IMAGE}
+
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        > /etc/apt/sources.list
 
 RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
     socat \
@@ -22,7 +37,7 @@ RUN groupadd -r ctf && useradd -r -g ctf ctf && \
     chown -R ctf:ctf /home/ctf
 
 COPY src/start.sh /start.sh
-RUN chmod +x /start.sh
+RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
 
 WORKDIR /home/ctf
 COPY --from=builder /src/pwn /home/ctf/pwn
