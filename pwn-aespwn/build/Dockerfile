@@ -1,4 +1,5 @@
-FROM debian:bookworm-slim
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
+FROM ${BASE_IMAGE}
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     socat \
@@ -11,7 +12,7 @@ RUN groupadd -r ctf && useradd -r -g ctf ctf && \
 
 COPY src/start.sh /start.sh
 COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
-RUN chmod +x /start.sh /usr/local/bin/challenge-entry
+RUN sed -i 's/\r$//' /start.sh /usr/local/bin/challenge-entry && chmod +x /start.sh /usr/local/bin/challenge-entry
 
 WORKDIR /home/ctf
 
@@ -24,7 +25,7 @@ RUN set -eux; \
     cp /bin/cat /home/ctf/bin/cat; \
     cp /bin/ls /home/ctf/bin/ls; \
     chmod 0755 /home/ctf/bin/sh /home/ctf/bin/cat /home/ctf/bin/ls; \
-    for lib in $(ldd /home/ctf/pwn /bin/sh /bin/cat /bin/ls | awk '{ if ($1 ~ /^\\//) print $1; if ($3 ~ /^\\//) print $3; }' | sort -u); do \
+    for lib in $(for bin in /home/ctf/pwn /bin/sh /bin/cat /bin/ls; do ldd "$bin"; done | awk '{ if ($1 ~ /^\//) print $1; if ($3 ~ /^\//) print $3; }' | sort -u); do \
         mkdir -p "/home/ctf$(dirname "$lib")"; \
         cp "$lib" "/home/ctf$lib"; \
     done

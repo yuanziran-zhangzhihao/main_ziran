@@ -6,5 +6,8 @@ if [ ! -x "$CHROOT_BIN" ]; then
     CHROOT_BIN="/usr/bin/chroot"
 fi
 
+CTF_UID="$(id -u ctf)"
+CTF_GID="$(id -g ctf)"
+
 exec 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&-
-exec "$CHROOT_BIN" --userspec=ctf:ctf /home/ctf /pwn
+exec "$CHROOT_BIN" --userspec="${CTF_UID}:${CTF_GID}" /home/ctf /pwn
