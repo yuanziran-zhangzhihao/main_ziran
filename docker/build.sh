@@ -44,6 +44,7 @@ echo "[*] building helper binaries"
 gcc -O2 -static -s -o "$staging/bin/launch-ctf" initramfs/launch_ctf.c
 gcc -O2 -static -s -o "$staging/bin/b64dec" initramfs/b64dec.c
 
+sed -i 's/\r$//' initramfs/init
 install -m 0755 initramfs/init "$staging/init"
 install -m 0644 babydriver.ko "$staging/babydriver.ko"
 

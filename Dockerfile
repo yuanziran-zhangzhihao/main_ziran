@@ -1,6 +1,14 @@
-FROM ubuntu:22.04 AS builder
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:ubuntu-22.04
+FROM ${BASE_IMAGE} AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN set -eux; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe' \
+        > /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -24,12 +32,20 @@ WORKDIR /work
 COPY Makefile README.md babydriver.c exp.c run.sh ./
 COPY initramfs ./initramfs
 COPY docker/build.sh /usr/local/bin/challenge-build
-RUN chmod 0755 /usr/local/bin/challenge-build \
+RUN sed -i 's/\r$//' /usr/local/bin/challenge-build \
+    && chmod 0755 /usr/local/bin/challenge-build \
     && /usr/local/bin/challenge-build
 
-FROM ubuntu:22.04
+FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN set -eux; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-updates main restricted universe' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ jammy-security main restricted universe' \
+        > /etc/apt/sources.list
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -52,7 +68,12 @@ COPY docker/session.sh /usr/local/bin/session.sh
 COPY docker/export-artifacts.sh /usr/local/bin/export-artifacts.sh
 COPY docker/post-build.sh /usr/local/bin/post-build.sh
 
-RUN chmod 0755 \
+RUN sed -i 's/\r$//' \
+        /usr/local/bin/start.sh \
+        /usr/local/bin/session.sh \
+        /usr/local/bin/export-artifacts.sh \
+        /usr/local/bin/post-build.sh \
+    && chmod 0755 \
         /usr/local/bin/start.sh \
         /usr/local/bin/session.sh \
         /usr/local/bin/export-artifacts.sh \
