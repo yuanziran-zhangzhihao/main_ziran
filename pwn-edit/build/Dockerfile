@@ -1,5 +1,13 @@
 # 使用 Debian 作为基础镜像（不再使用无效的 builder 阶段）
-FROM debian:bookworm-slim
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
+FROM ${BASE_IMAGE}
+
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        > /etc/apt/sources.list
 
 # 安装 socat
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -14,7 +22,7 @@ RUN groupadd -r ctf && useradd -r -g ctf ctf && \
 # 复制启动脚本（假设 start.sh 在 src/ 中）
 COPY src/start.sh /start.sh
 COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
-RUN chmod +x /start.sh /usr/local/bin/challenge-entry
+RUN sed -i 's/\r$//' /start.sh /usr/local/bin/challenge-entry && chmod +x /start.sh /usr/local/bin/challenge-entry
 
 WORKDIR /home/ctf
 
