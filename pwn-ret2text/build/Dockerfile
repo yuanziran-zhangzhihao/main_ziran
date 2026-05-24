@@ -1,7 +1,15 @@
-FROM debian:bookworm-slim
+ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
+FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PORT=8000
+
+RUN set -eux; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
+    printf '%s\n' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        > /etc/apt/sources.list
 
 RUN apt-get -o Acquire::Retries=5 update && \
     apt-get -o Acquire::Retries=5 install -y --no-install-recommends \
@@ -9,8 +17,8 @@ RUN apt-get -o Acquire::Retries=5 update && \
         socat && \
     rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -g 1000 ctf && \
-    useradd -u 1000 -g ctf -d /home/ctf -s /bin/sh ctf
+RUN groupadd -r ctf && \
+    useradd -r -g ctf -d /home/ctf -s /bin/sh ctf
 
 WORKDIR /home/ctf
 
@@ -18,7 +26,8 @@ COPY src/pwn /home/ctf/pwn
 COPY src/start.sh /start.sh
 COPY src/challenge-entry.sh /usr/local/bin/challenge-entry
 
-RUN set -eu; \
+RUN sed -i 's/\r$//' /start.sh /usr/local/bin/challenge-entry \
+    && set -eu; \
     chmod 0755 /home/ctf/pwn /start.sh /usr/local/bin/challenge-entry; \
     mkdir -p /home/ctf/bin /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64; \
     cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/lib/x86_64-linux-gnu/libc.so.6; \

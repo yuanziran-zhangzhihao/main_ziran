@@ -10,4 +10,7 @@ for fd in 3 4 5 6 7 8 9; do
     eval "exec ${fd}>&-" 2>/dev/null || true
 done
 
-exec "$CHROOT_BIN" --userspec=1000:1000 /home/ctf ./pwn
+CTF_UID="$(id -u ctf)"
+CTF_GID="$(id -g ctf)"
+
+exec "$CHROOT_BIN" --userspec="${CTF_UID}:${CTF_GID}" /home/ctf ./pwn
