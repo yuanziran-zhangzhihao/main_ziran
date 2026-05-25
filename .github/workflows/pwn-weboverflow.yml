@@ -43,14 +43,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./pwn-weboverflow/build
-          push: true
-          tags: |
-            ${{ env.IMAGE_LATEST }}
+      - name: Build local image
+        run: docker build -t ${{ env.NAME }}-build ./pwn-weboverflow/build
+
+      - name: Flatten and push image
+        run: |
+          set -euo pipefail
+          cid="$(docker create ${{ env.NAME }}-build)"
+          trap 'docker rm -f "$cid" >/dev/null 2>&1 || true; rm -f rootfs.tar' EXIT
+          docker export "$cid" -o rootfs.tar
+          docker rm -f "$cid"
+          docker import \
+            --change 'CMD /start.sh' \
+            --change 'WORKDIR /home/ctf' \
+            --change 'EXPOSE 8000' \
+            --change 'USER root' \
+            --change 'ENV PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' \
+            rootfs.tar \
             ${{ env.IMAGE_SHA }}
+          docker tag ${{ env.IMAGE_SHA }} ${{ env.IMAGE_LATEST }}
+          docker push ${{ env.IMAGE_SHA }}
+          docker push ${{ env.IMAGE_LATEST }}
 
       - name: Pull image for validation
         run: docker pull ${{ env.IMAGE_SHA }}
