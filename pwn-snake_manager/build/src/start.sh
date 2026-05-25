@@ -26,4 +26,4 @@ chmod 0400 /home/ctf/flag
 
 echo "[*] pwn-snake_manager service listening on ${PORT}"
 
-exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",pty,ctty,stderr,setsid,sigint,sane
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",pty,ctty,stderr,setsid,sigint,rawer,echo=0
