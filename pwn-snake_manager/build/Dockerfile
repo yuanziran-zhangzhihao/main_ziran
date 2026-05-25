@@ -1,11 +1,11 @@
-ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
+ARG BASE_IMAGE=debian:12-slim
 FROM ${BASE_IMAGE} AS build
 
 RUN set -eux; \
     rm -f /etc/apt/sources.list.d/debian.sources; \
     printf '%s\n' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        'deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb http://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
         > /etc/apt/sources.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -32,8 +32,8 @@ FROM ${BASE_IMAGE}
 RUN set -eux; \
     rm -f /etc/apt/sources.list.d/debian.sources; \
     printf '%s\n' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
+        'deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
+        'deb http://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
         > /etc/apt/sources.list
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
