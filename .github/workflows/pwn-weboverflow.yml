@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
 env:
-  NAME: pwn-weboverflow
-  IMAGE_LATEST: ghcr.io/${{ github.repository_owner }}/pwn-weboverflow:latest
-  IMAGE_SHA: ghcr.io/${{ github.repository_owner }}/pwn-weboverflow:sha-${{ github.sha }}
+  NAME: pwn-server_fmt
+  IMAGE_LATEST: ghcr.io/${{ github.repository_owner }}/pwn-server_fmt:latest
+  IMAGE_SHA: ghcr.io/${{ github.repository_owner }}/pwn-server_fmt:sha-${{ github.sha }}
 
 jobs:
   challenge-build:
@@ -115,7 +115,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           owner: ${{ github.repository_owner }}
-          package: pwn-weboverflow
+          package: pwn-server_fmt
           exclude-tags: latest
           dry-run: true
           delete-untagged: true
