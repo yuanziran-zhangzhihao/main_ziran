@@ -26,6 +26,6 @@ chmod 0400 /home/ctf/flag
 
 echo "[*] pwn-snake service listening on ${PORT}"
 
-# The challenge is a curses TUI program, so it needs a PTY to render and flush
-# interactively for remote players instead of behaving like a buffered pipe.
-exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",pty,setsid,ctty,stderr
+# The challenge is a curses TUI program, so it needs a PTY. Keep the PTY in
+# raw mode so the overflow stage can still receive exact exploit bytes.
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",pty,setsid,ctty,stderr,rawer,echo=0
