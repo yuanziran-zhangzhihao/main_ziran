@@ -16,7 +16,7 @@ elif [ -n "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{pwn_snake_static_20260604}"
+    INSERT_FLAG="PCTF{snake_game_last_words_stack_overflow}"
 fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
