@@ -14,7 +14,7 @@ elif [ "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
+    INSERT_FLAG="PCTF{pwn_bypass_static_20260604}"
 fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
