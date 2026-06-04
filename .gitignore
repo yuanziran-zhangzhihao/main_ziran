@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+pwn-snake_manager/deploy/
+pwn-snake_manager/attachments/
+pwn-snake_manager/build/src/.gdb_history
+pwn-snake_manager/build/src/*.i64
+pwn-snake_manager/build/src/*.id0
+pwn-snake_manager/build/src/*.id1
+pwn-snake_manager/build/src/*.id2
+pwn-snake_manager/build/src/*.nam
+pwn-snake_manager/build/src/*.til

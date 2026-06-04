@@ -1,32 +1,4 @@
 ARG BASE_IMAGE=debian:12-slim
-FROM ${BASE_IMAGE} AS build
-
-RUN set -eux; \
-    rm -f /etc/apt/sources.list.d/debian.sources; \
-    printf '%s\n' \
-        'deb http://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
-        'deb http://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
-        > /etc/apt/sources.list
-
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libc6-dev \
-    libncurses-dev \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-
-COPY src/snake_server.c /build/snake_server.c
-
-RUN gcc snake_server.c -o pwn \
-    -fno-stack-protector \
-    -no-pie \
-    -z execstack \
-    -fcf-protection=full \
-    -lncursesw \
-    -ltinfo
-
 FROM ${BASE_IMAGE}
 
 RUN set -eux; \
@@ -59,7 +31,7 @@ RUN sed -i 's/\r$//' /start.sh /usr/local/bin/challenge-entry && chmod +x /start
 
 WORKDIR /home/ctf
 
-COPY --from=build /build/pwn /home/ctf/pwn
+COPY src/pwn /home/ctf/pwn
 RUN chmod +x /home/ctf/pwn
 
 RUN set -eux; \
