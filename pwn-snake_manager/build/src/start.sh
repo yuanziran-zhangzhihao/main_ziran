@@ -16,7 +16,7 @@ elif [ "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{pwn_snake_manager_static_20260604}"
+    INSERT_FLAG="PCTF{snake_manager_password_leak_admin_shell}"
 fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
