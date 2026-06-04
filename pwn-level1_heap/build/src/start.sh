@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-FLAG_VALUE="PCTF{pwn_level1_heap_static_20260604}"
+FLAG_VALUE="PCTF{heap_level1_fastbin_dup_to_stack_rop}"
 CTF_UID="${CTF_UID:-1000}"
 CTF_GID="${CTF_GID:-1000}"
 
