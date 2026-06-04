@@ -99,11 +99,38 @@ jobs:
           chmod +x post-build.sh
           ./post-build.sh
 
+      - name: Verify runtime binary matches attachment
+        run: |
+          cmp -s ${{ env.NAME }}/build/runtime/home/ctf/pwn ${{ env.NAME }}/attachments/pwn
+          sha256sum ${{ env.NAME }}/build/runtime/home/ctf/pwn ${{ env.NAME }}/attachments/pwn
+
       - name: Upload attachments
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.NAME }}-attachments
           path: ${{ env.NAME }}/attachments/
+
+      - name: Export image tar for platform import
+        run: |
+          mkdir -p ${{ env.NAME }}/deploy
+          cid="$(docker create "${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}")"
+          trap 'docker rm -v "$cid" >/dev/null 2>&1 || true' EXIT
+          docker export "$cid" -o ${{ env.NAME }}/deploy/rootfs.tar
+          docker import \
+            --change 'EXPOSE 8000' \
+            --change 'WORKDIR /home/ctf' \
+            --change 'ENTRYPOINT /app/launcher' \
+            ${{ env.NAME }}/deploy/rootfs.tar \
+            "${{ env.NAME }}:platform-${{ github.sha }}"
+          rm -f ${{ env.NAME }}/deploy/rootfs.tar
+          docker save "${{ env.NAME }}:platform-${{ github.sha }}" | gzip -9 > ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
+          ls -lh ${{ env.NAME }}/deploy
+
+      - name: Upload platform image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}-platform-image
+          path: ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
 
   prune-old-images:
     runs-on: ubuntu-latest
