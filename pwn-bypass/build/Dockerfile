@@ -1,12 +1,4 @@
-ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:debian-12
-FROM ${BASE_IMAGE} AS builder
-
-RUN set -eux; \
-    rm -f /etc/apt/sources.list.d/debian.sources; \
-    printf '%s\n' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
-        > /etc/apt/sources.list
+FROM debian:bookworm-slim AS builder
 
 RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
     binutils \
@@ -21,14 +13,7 @@ RUN gcc -O0 -fno-stack-protector -no-pie -z norelro -fcf-protection=none \
     -o /src/pwn /src/bypass.c && \
     objcopy --remove-section .note.gnu.property /src/pwn
 
-FROM ${BASE_IMAGE}
-
-RUN set -eux; \
-    rm -f /etc/apt/sources.list.d/debian.sources; \
-    printf '%s\n' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian bookworm main contrib non-free non-free-firmware' \
-        'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security bookworm-security main contrib non-free non-free-firmware' \
-        > /etc/apt/sources.list
+FROM debian:bookworm-slim
 
 RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
     socat \
