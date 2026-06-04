@@ -84,6 +84,7 @@ jobs:
           NAME: ${{ env.NAME }}
           IMAGE_TAG: ${{ env.IMAGE_SHA }}
         run: |
+          sed -i 's/\r$//' post-build.sh
           chmod +x post-build.sh
           ./post-build.sh
 
@@ -93,6 +94,8 @@ jobs:
           test -f pwn-weboverflow/attachments/server
           test -f pwn-weboverflow/attachments/libc.so.6
           test -f pwn-weboverflow/attachments/ld-linux-x86-64.so.2
+          cmp -s pwn-weboverflow/build/src/pwn pwn-weboverflow/attachments/pwn
+          sha256sum pwn-weboverflow/build/src/pwn pwn-weboverflow/attachments/pwn
           ls -lh pwn-weboverflow/attachments
 
       - name: Build platform direct bundle
@@ -102,6 +105,11 @@ jobs:
             pwn-weboverflow/PLATFORM_DEPLOY.md \
             pwn-weboverflow/build \
             pwn-weboverflow/selftest
+
+      - name: Save platform image tar
+        run: |
+          docker save "${{ env.IMAGE_SHA }}" | gzip -9 > pwn-weboverflow-platform-image.tar.gz
+          ls -lh pwn-weboverflow-platform-image.tar.gz
 
       - name: Upload attachments
         uses: actions/upload-artifact@v4
@@ -114,6 +122,12 @@ jobs:
         with:
           name: pwn-weboverflow-platform-direct
           path: pwn-weboverflow-platform-direct.tar.gz
+
+      - name: Upload platform image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwn-weboverflow-platform-image
+          path: pwn-weboverflow-platform-image.tar.gz
 
   prune-old-images:
     runs-on: ubuntu-latest

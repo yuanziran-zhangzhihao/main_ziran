@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+pwn-weboverflow/attachments/
+pwn-weboverflow-platform-*.tar.gz
