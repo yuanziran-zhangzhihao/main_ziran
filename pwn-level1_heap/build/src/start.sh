@@ -2,6 +2,8 @@
 set -eu
 
 FLAG_VALUE="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
+CTF_UID="${CTF_UID:-1000}"
+CTF_GID="${CTF_GID:-1000}"
 
 if [ -n "${A1CTF_FLAG:-}" ]; then
     FLAG_VALUE="$A1CTF_FLAG"
@@ -18,11 +20,8 @@ elif [ -n "${FLAG:-}" ]; then
 fi
 
 printf '%s' "$FLAG_VALUE" > /home/ctf/flag
-chown ctf:ctf /home/ctf/flag
+chown "$CTF_UID:$CTF_GID" /home/ctf/flag
 chmod 0400 /home/ctf/flag
-
-CTF_UID="$(id -u ctf)"
-CTF_GID="$(id -g ctf)"
 
 # The challenge binary already opens its own listening socket on port 6666.
 /usr/sbin/chroot --userspec="${CTF_UID}:${CTF_GID}" /home/ctf /pwn &

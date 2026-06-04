@@ -33,6 +33,8 @@ jobs:
         run: |
           dockerfile_path="${{ env.NAME }}/build/Dockerfile"
           echo "Looking for Dockerfile at: $dockerfile_path"
+          test -f "${{ env.NAME }}/build/src/pwn"
+          test -f "${{ env.NAME }}/build/src/start.sh"
           if [ ! -f "$dockerfile_path" ]; then
             echo "❌ Dockerfile not found!"
             exit 1
@@ -53,7 +55,9 @@ jobs:
         with:
           context: ${{ env.NAME }}/build
           push: true
-          tags: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+            ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
 
       # 5. 运行 post-build 脚本（提取附件等）
       - name: Run post-build script
@@ -61,10 +65,16 @@ jobs:
         env:
           GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
           NAME: ${{ env.NAME }}
-          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:latest
+          IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
         run: |
+          sed -i 's/\r$//' post-build.sh
           chmod +x post-build.sh
           ./post-build.sh
+
+      - name: Verify local debug binary matches attachment
+        run: |
+          cmp -s ${{ env.NAME }}/build/src/pwn ${{ env.NAME }}/attachments/pwn
+          sha256sum ${{ env.NAME }}/build/src/pwn ${{ env.NAME }}/attachments/pwn
 
       # 6. 上传附件到 Artifacts
       - name: Upload attachments
@@ -72,6 +82,27 @@ jobs:
         with:
           name: ${{ env.NAME }}-attachments
           path: ${{ env.NAME }}/attachments/
+
+      - name: Export image tar for platform import
+        run: |
+          mkdir -p ${{ env.NAME }}/deploy
+          cid="$(docker create "${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}")"
+          trap 'docker rm -v "$cid" >/dev/null 2>&1 || true' EXIT
+          docker export "$cid" -o ${{ env.NAME }}/deploy/rootfs.tar
+          docker import \
+            --change 'EXPOSE 8000' \
+            --change 'CMD /start.sh' \
+            ${{ env.NAME }}/deploy/rootfs.tar \
+            "${{ env.NAME }}:platform-${{ github.sha }}"
+          rm -f ${{ env.NAME }}/deploy/rootfs.tar
+          docker save "${{ env.NAME }}:platform-${{ github.sha }}" | gzip -9 > ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
+          ls -lh ${{ env.NAME }}/deploy
+
+      - name: Upload platform image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}-platform-image
+          path: ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
 
   # 清理旧的 GHCR 镜像版本（关键：只传包名，不带用户名前缀！）
   prune-old-images:

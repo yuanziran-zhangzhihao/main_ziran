@@ -1,47 +1,55 @@
-ARG BASE_IMAGE=mcr.microsoft.com/devcontainers/base:ubuntu-20.04
-FROM ${BASE_IMAGE}
+ARG BASE_IMAGE=mcr.microsoft.com/mirror/docker/library/ubuntu:20.04
+FROM ${BASE_IMAGE} AS builder
 
-# Keep only the repositories needed for runtime packages and use a stable mirror.
 RUN sed -i \
-        -e 's|http://archive.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
-        -e 's|http://security.ubuntu.com/ubuntu/|https://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+        -e 's|http://archive.ubuntu.com/ubuntu/|http://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
+        -e 's|http://security.ubuntu.com/ubuntu/|http://mirrors.tuna.tsinghua.edu.cn/ubuntu/|g' \
         -e '/^[[:space:]]*deb .* focal-backports /d' \
         -e '/^[[:space:]]*deb .* multiverse/d' \
         /etc/apt/sources.list && \
     apt-get update -o Acquire::Retries=5 && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        busybox-static \
         socat \
         ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-RUN groupadd -r ctf && \
-    useradd -r -g ctf -d /home/ctf -s /bin/sh ctf
+WORKDIR /work
 
-WORKDIR /home/ctf
+COPY src/pwn /work/pwn
+COPY src/start.sh /work/start.sh
 
-COPY src/pwn /home/ctf/pwn
-COPY src/start.sh /start.sh
+RUN set -eux; \
+    sed -i 's/\r$//' /work/start.sh; \
+    chmod 0755 /work/pwn /work/start.sh; \
+    mkdir -p /rootfs/bin /rootfs/usr/bin /rootfs/usr/sbin; \
+    cp /bin/busybox /rootfs/bin/busybox; \
+    for app in sh grep sleep chown chmod; do \
+        ln -s /bin/busybox "/rootfs/bin/$app"; \
+    done; \
+    cp /work/start.sh /rootfs/start.sh; \
+    cp /usr/bin/socat /rootfs/usr/bin/socat; \
+    cp /usr/sbin/chroot /rootfs/usr/sbin/chroot; \
+    for bin in /usr/bin/socat /usr/sbin/chroot; do \
+        for lib in $(ldd "$bin" | awk '{ if ($1 ~ /^\//) print $1; if ($3 ~ /^\//) print $3; }' | sort -u); do \
+            mkdir -p "/rootfs$(dirname "$lib")"; \
+            cp "$lib" "/rootfs$lib"; \
+        done; \
+    done; \
+    mkdir -p /rootfs/home/ctf/bin /rootfs/home/ctf/lib/x86_64-linux-gnu /rootfs/home/ctf/lib64; \
+    cp /work/pwn /rootfs/home/ctf/pwn; \
+    cp /bin/busybox /rootfs/home/ctf/bin/busybox; \
+    ln -s /bin/busybox /rootfs/home/ctf/bin/sh; \
+    ln -s /bin/busybox /rootfs/home/ctf/bin/cat; \
+    ln -s /bin/busybox /rootfs/home/ctf/bin/ls; \
+    cp /lib/x86_64-linux-gnu/libc.so.6 /rootfs/home/ctf/libc.so.6; \
+    cp /lib64/ld-linux-x86-64.so.2 /rootfs/home/ctf/ld-linux-x86-64.so.2; \
+    cp /lib/x86_64-linux-gnu/libc.so.6 /rootfs/home/ctf/lib/x86_64-linux-gnu/libc.so.6; \
+    cp /lib64/ld-linux-x86-64.so.2 /rootfs/home/ctf/lib64/ld-linux-x86-64.so.2
 
-# The binary is patched to use:
-# - interpreter: ./ld-linux-x86-64.so.2
-# - NEEDED:      ./libc.so.6
-# so both files must exist at the root of the chroot.
-RUN sed -i 's/\r$//' /start.sh && \
-    chmod 0755 /home/ctf/pwn /start.sh && \
-    mkdir -p /home/ctf/bin /home/ctf/lib/x86_64-linux-gnu /home/ctf/lib64 && \
-    cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/libc.so.6 && \
-    cp /lib64/ld-linux-x86-64.so.2 /home/ctf/ld-linux-x86-64.so.2 && \
-    cp /lib/x86_64-linux-gnu/libc.so.6 /home/ctf/lib/x86_64-linux-gnu/libc.so.6 && \
-    cp /lib64/ld-linux-x86-64.so.2 /home/ctf/lib64/ld-linux-x86-64.so.2 && \
-    cp /bin/sh /home/ctf/bin/sh && \
-    cp /bin/cat /home/ctf/bin/cat && \
-    cp /bin/ls /home/ctf/bin/ls && \
-    for lib in $(ldd /bin/sh /bin/cat /bin/ls | grep -o '/lib[^[:space:]]*' | sort -u); do \
-        mkdir -p "/home/ctf$(dirname "$lib")"; \
-        cp "$lib" "/home/ctf$lib"; \
-    done && \
-    chown -R root:root /home/ctf && \
-    chmod 0755 /home/ctf /home/ctf/bin /home/ctf/lib /home/ctf/lib64 /home/ctf/lib/x86_64-linux-gnu
+FROM scratch
+
+COPY --from=builder /rootfs/ /
 
 EXPOSE 8000
 
