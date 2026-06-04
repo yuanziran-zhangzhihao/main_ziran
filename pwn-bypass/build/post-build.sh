@@ -58,7 +58,7 @@ copy_file() {
     local src="$1"
     local dest_dir="$2"
     local filename=$(basename "$src")
-    
+
     if docker cp "$CONTAINER_ID:$src" "$dest_dir/" &> /dev/null; then
         echo "✅ Copied: $filename"
     else
