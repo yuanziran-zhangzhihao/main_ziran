@@ -34,7 +34,7 @@ static const char *pick_flag(void)
             return value;
     }
 
-    return "PCTF{pwn_ret2dlresolve_static_20260604}";
+    return "PCTF{ret2dlresolve_lazy_binding_shell}";
 }
 
 static void clear_flag_env(void)

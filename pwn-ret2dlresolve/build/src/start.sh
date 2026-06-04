@@ -13,7 +13,7 @@ elif [ "$FLAG" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{pwn_ret2dlresolve_static_20260604}"
+    INSERT_FLAG="PCTF{ret2dlresolve_lazy_binding_shell}"
 fi
 
 echo -n $INSERT_FLAG > /home/ctf/flag
