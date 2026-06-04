@@ -2,6 +2,8 @@
 set -eu
 
 PORT="${PORT:-8000}"
+CTF_UID="${CTF_UID:-1000}"
+CTF_GID="${CTF_GID:-1000}"
 
 if [ -n "${A1CTF_FLAG:-}" ]; then
     INSERT_FLAG="$A1CTF_FLAG"
@@ -21,7 +23,7 @@ fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
 unset INSERT_FLAG
-chown ctf:ctf /home/ctf/flag
+chown "$CTF_UID:$CTF_GID" /home/ctf/flag
 chmod 0400 /home/ctf/flag
 
 echo "[*] pwn-aespwn service listening on ${PORT}"
@@ -29,4 +31,4 @@ echo "[*] pwn-aespwn service listening on ${PORT}"
 # Keep the challenge on plain stdin/stdout pipes so the post-success shell reads
 # scripted commands normally. The smoke test sends the ciphertext immediately
 # and does not rely on the unflushed prompt being visible first.
-exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/local/bin/challenge-entry",stderr
+exec socat -T60 TCP-LISTEN:"$PORT",reuseaddr,fork EXEC:"/usr/bin/challenge-entry",stderr

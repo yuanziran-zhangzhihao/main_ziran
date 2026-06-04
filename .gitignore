@@ -1,2 +1,11 @@
 __pycache__/
 *.pyc
+pwn-aespwn/attachments/
+pwn-aespwn/deploy/
+pwn-aespwn/build/src/*.i64
+pwn-aespwn/build/src/*.id0
+pwn-aespwn/build/src/*.id1
+pwn-aespwn/build/src/*.id2
+pwn-aespwn/build/src/*.nam
+pwn-aespwn/build/src/*.til
+pwn-aespwn/build/src/re1.py
