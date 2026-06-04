@@ -17,7 +17,7 @@ elif [ "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{pwn_weboverflow_static_20260604}"
+    INSERT_FLAG="PCTF{ez_ioctl_babyioctl_oob_read}"
 fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
