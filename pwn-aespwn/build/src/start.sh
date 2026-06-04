@@ -18,7 +18,7 @@ elif [ -n "${FLAG:-}" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{pwn_aespwn_static_20260604}"
+    INSERT_FLAG="PCTF{aes_ecb_known_ciphertext_shell}"
 fi
 
 printf '%s' "$INSERT_FLAG" > /home/ctf/flag
