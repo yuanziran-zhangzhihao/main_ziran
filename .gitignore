@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+pwn-snake/attachments/
+pwn-snake/deploy/

@@ -28,6 +28,9 @@ jobs:
         run: |
           dockerfile_path="${{ env.NAME }}/build/Dockerfile"
           echo "Looking for Dockerfile at: $dockerfile_path"
+          test -f "${{ env.NAME }}/build/src/pwn"
+          test -f "${{ env.NAME }}/build/src/start.sh"
+          test -f "${{ env.NAME }}/build/src/challenge-entry.sh"
           if [ ! -f "$dockerfile_path" ]; then
             echo "❌ Dockerfile not found!"
             exit 1
@@ -57,8 +60,14 @@ jobs:
           NAME: ${{ env.NAME }}
           IMAGE_TAG: ${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}
         run: |
+          sed -i 's/\r$//' post-build.sh
           chmod +x post-build.sh
           ./post-build.sh
+
+      - name: Verify local debug binary matches attachment
+        run: |
+          cmp -s ${{ env.NAME }}/build/src/pwn ${{ env.NAME }}/attachments/pwn
+          sha256sum ${{ env.NAME }}/build/src/pwn ${{ env.NAME }}/attachments/pwn
 
       - name: Start smoke container
         run: |
@@ -99,6 +108,29 @@ jobs:
         with:
           name: ${{ env.NAME }}-attachments
           path: ${{ env.NAME }}/attachments/
+
+      - name: Export image tar for platform import
+        run: |
+          mkdir -p ${{ env.NAME }}/deploy
+          cid="$(docker create "${{ env.IMAGE_PREFIX }}/${{ env.NAME }}:sha-${{ github.sha }}")"
+          trap 'docker rm -v "$cid" >/dev/null 2>&1 || true' EXIT
+          docker export "$cid" -o ${{ env.NAME }}/deploy/rootfs.tar
+          docker import \
+            --change 'ENV TERM=xterm' \
+            --change 'EXPOSE 8000' \
+            --change 'WORKDIR /home/ctf' \
+            --change 'CMD /start.sh' \
+            ${{ env.NAME }}/deploy/rootfs.tar \
+            "${{ env.NAME }}:platform-${{ github.sha }}"
+          rm -f ${{ env.NAME }}/deploy/rootfs.tar
+          docker save "${{ env.NAME }}:platform-${{ github.sha }}" | gzip -9 > ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
+          ls -lh ${{ env.NAME }}/deploy
+
+      - name: Upload platform image tar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}-platform-image
+          path: ${{ env.NAME }}/deploy/${{ env.NAME }}-image.tar.gz
 
       - name: Upload smoke logs on failure
         if: failure()
