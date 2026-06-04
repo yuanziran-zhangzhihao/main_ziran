@@ -109,6 +109,21 @@ jobs:
           file dist/routerd
           ls -lh dist
 
+      - name: Export image tar for platform import
+        run: |
+          cid="$(docker create "${{ env.IMAGE_REPO }}:${{ env.IMAGE_SHA_TAG }}")"
+          trap 'docker rm -v "$cid" >/dev/null 2>&1 || true' EXIT
+          docker export "$cid" -o dist/rootfs.tar
+          docker import \
+            --change 'EXPOSE 8080' \
+            --change 'WORKDIR /app' \
+            --change 'CMD /app/routerd' \
+            dist/rootfs.tar \
+            "pwn-router:platform-${{ github.sha }}"
+          rm -f dist/rootfs.tar
+          docker save "pwn-router:platform-${{ github.sha }}" | gzip -9 > dist/pwn-router-image.tar.gz
+          ls -lh dist/pwn-router-image.tar.gz
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
