@@ -1,18 +1,3 @@
-FROM debian:bookworm-slim AS builder
-
-RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
-    binutils \
-    gcc \
-    libc6-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /src
-COPY src/bypass.c /src/bypass.c
-
-RUN gcc -O0 -fno-stack-protector -no-pie -z norelro -fcf-protection=none \
-    -o /src/pwn /src/bypass.c && \
-    objcopy --remove-section .note.gnu.property /src/pwn
-
 FROM debian:bookworm-slim
 
 RUN apt-get update -o Acquire::Retries=3 && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
@@ -27,7 +12,7 @@ COPY src/start.sh /start.sh
 RUN sed -i 's/\r$//' /start.sh && chmod +x /start.sh
 
 WORKDIR /home/ctf
-COPY --from=builder /src/pwn /home/ctf/pwn
+COPY src/pwn /home/ctf/pwn
 
 RUN set -eux; \
     chmod +x /home/ctf/pwn; \

@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+gzctf-index.js
+playwright-state.json
+*.zip
+pwn-running-latest
+pwn-bypass/deploy/
+pwn-bypass/attachments/
+pwn-bypass/build/src/.gdb_history
+pwn-bypass/build/src/*.i64
+pwn-bypass/build/src/*.id0
+pwn-bypass/build/src/*.id1
+pwn-bypass/build/src/*.id2
+pwn-bypass/build/src/*.nam
+pwn-bypass/build/src/*.til
