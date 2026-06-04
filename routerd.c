@@ -21,7 +21,7 @@ static const char *get_flag(void)
     if (!flag || !*flag)
         flag = getenv("FLAG");
     if (!flag || !*flag)
-        flag = "flag{demo_router_flag}";
+        flag = "PCTF{pwn_router_static_20260604}";
     return flag;
 }
 
