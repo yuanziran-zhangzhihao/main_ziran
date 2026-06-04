@@ -21,7 +21,7 @@ static const char *get_flag(void)
     if (!flag || !*flag)
         flag = getenv("FLAG");
     if (!flag || !*flag)
-        flag = "PCTF{pwn_router_static_20260604}";
+        flag = "PCTF{ez_backend_ssid_diag_bypass}";
     return flag;
 }
 
