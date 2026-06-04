@@ -34,7 +34,7 @@ static const char *pick_flag(void)
             return value;
     }
 
-    return "flag{demo_ret2dlresolve}";
+    return "PCTF{pwn_ret2dlresolve_static_20260604}";
 }
 
 static void clear_flag_env(void)

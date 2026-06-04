@@ -13,7 +13,7 @@ elif [ "$FLAG" ]; then
     INSERT_FLAG="$FLAG"
     unset FLAG
 else
-    INSERT_FLAG="PCTF{!!!!_FLAG_ERROR_ASK_ADMIN_!!!!}"
+    INSERT_FLAG="PCTF{pwn_ret2dlresolve_static_20260604}"
 fi
 
 echo -n $INSERT_FLAG > /home/ctf/flag
